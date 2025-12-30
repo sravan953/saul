@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saul - Legal Analysis Copilot</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Column: File List -->
+        <div class="column left-column">
+            <h2>Cases</h2>
+            <div id="file-list" class="file-list">
+                <!-- Files will be populated here -->
+            </div>
+        </div>
+
+        <!-- Middle Column: HTML Viewer -->
+        <div class="column middle-column">
+            <h2>Case View</h2>
+            <div id="html-viewer" class="html-viewer">
+                <iframe id="case-frame" title="Case Content"></iframe>
+            </div>
+        </div>
+
+        <!-- Right Column: Analysis -->
+        <div class="column right-column">
+            <div class="header-actions">
+                <h2>Analysis</h2>
+                <button id="run-btn" class="run-btn" disabled>Run Saul</button>
+            </div>
+            <div id="analysis-output" class="analysis-output">
+                <pre id="output-text"></pre>
+            </div>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>
+
