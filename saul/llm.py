@@ -1,7 +1,10 @@
 import asyncio
 import json
 import os
+from pathlib import Path
 from typing import AsyncGenerator
+
+from loguru import logger
 
 import httpx
 import requests
@@ -12,8 +15,8 @@ from openai import OpenAI
 
 load_dotenv()
 
-LLM_PROVIDER = os.getenv(
-    "LLM_PROVIDER", "ollama"
+LLM_PROVIDER = (
+    os.getenv("LLM_PROVIDER", "ollama").strip().lower()
 )  # "ollama", "openrouter", or "openai"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = "google/gemma-3-12b-it:free"
@@ -60,7 +63,9 @@ async def _check_ollama() -> None:
         )
 
 
-async def call_ollama(prompt: str) -> AsyncGenerator[str, None]:
+async def call_ollama(
+    prompt: str, save_path: Path | None = None
+) -> AsyncGenerator[str, None]:
     client = AsyncClient()
     stream = await client.chat(
         model=OLLAMA_MODEL,
@@ -73,10 +78,13 @@ async def call_ollama(prompt: str) -> AsyncGenerator[str, None]:
     async for chunk in stream:
         full_response += chunk["message"]["content"]
     analysis = Analysis.model_validate_json(full_response)
+    if save_path:
+        with open(save_path, "w") as f:
+            f.write(analysis.model_dump_json(indent=2))
     yield format_analysis_html(analysis)
 
 
-def _call_openrouter(prompt: str) -> str:
+def _call_openrouter(prompt: str, save_path: Path | None = None) -> str:
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -99,15 +107,20 @@ def _call_openrouter(prompt: str) -> str:
     data = response.json()
     content = data["choices"][0]["message"]["content"]
     analysis = Analysis.model_validate_json(content)
+    if save_path:
+        with open(save_path, "w") as f:
+            f.write(analysis.model_dump_json(indent=2))
     return format_analysis_html(analysis)
 
 
-async def call_openrouter(prompt: str) -> AsyncGenerator[str, None]:
-    content = await asyncio.to_thread(_call_openrouter, prompt)
+async def call_openrouter(
+    prompt: str, save_path: Path | None = None
+) -> AsyncGenerator[str, None]:
+    content = await asyncio.to_thread(_call_openrouter, prompt, save_path)
     yield content
 
 
-def _call_openai(prompt: str) -> str:
+def _call_openai(prompt: str, save_path: Path | None = None) -> str:
     client = OpenAI()
     response = client.responses.parse(
         model=OPENAI_MODEL,
@@ -120,22 +133,31 @@ def _call_openai(prompt: str) -> str:
         ],
         text_format=Analysis,
     )
+    if save_path:
+        with open(save_path, "w") as f:
+            f.write(response.output_parsed.model_dump_json(indent=2))
     return format_analysis_html(response.output_parsed)
 
 
-async def call_openai(prompt: str) -> AsyncGenerator[str, None]:
-    content = await asyncio.to_thread(_call_openai, prompt)
+async def call_openai(
+    prompt: str, save_path: Path | None = None
+) -> AsyncGenerator[str, None]:
+    content = await asyncio.to_thread(_call_openai, prompt, save_path)
     yield content
 
 
-async def stream_analysis(full_opinion: str) -> AsyncGenerator[str, None]:
+async def stream_analysis(
+    full_opinion: str, save_path: Path | None = None
+) -> AsyncGenerator[str, None]:
     """Check provider availability and return the streaming generator."""
     prompt = PROMPT_TEMPLATE.format(text=full_opinion)
 
+    logger.info(f"Using LLM provider: {LLM_PROVIDER}")
+
     if LLM_PROVIDER == "openrouter":
-        return call_openrouter(prompt)
+        return call_openrouter(prompt, save_path)
     elif LLM_PROVIDER == "openai":
-        return call_openai(prompt)
+        return call_openai(prompt, save_path)
     else:
         await _check_ollama()
-        return call_ollama(prompt)
+        return call_ollama(prompt, save_path)

@@ -40,6 +40,28 @@ document.addEventListener('DOMContentLoaded', () => {
             abortController = null;
             runBtn.textContent = 'Run Saul';
         }
+
+        // Auto-load cached analysis if available
+        fetch(`/api/output/${filename}`)
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                }
+                // If 404 or other error, do nothing (wait for user run)
+                return null;
+            })
+            .then(html => {
+                if (html) {
+                    outputText.innerHTML = html;
+                    // Auto-scroll to bottom
+                    const outputContainer = document.getElementById('analysis-output');
+                    outputContainer.scrollTop = outputContainer.scrollHeight;
+                }
+            })
+            .catch(err => {
+                // Ignore errors (just means no cache or network issue)
+                console.log('Cache check failed:', err);
+            });
     }
 
     runBtn.onclick = async () => {
