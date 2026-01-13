@@ -1,15 +1,17 @@
 import json
 import sys
 from pathlib import Path
+from typing import Optional
 
-sys.path.append(Path(__file__).resolve().parent)
+sys.path.append(str(Path(__file__).resolve().parent))
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from llm import OllamaNotRunningError, format_analysis_html, stream_analysis
 from model import Analysis
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -109,6 +111,73 @@ async def analyze_case(filename: str):
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/batch/status")
+async def batch_status():
+    total = len(list(JSON_DIR.glob("*.json"))) if JSON_DIR.exists() else 0
+    processed = len(list(OUTPUT_DIR.glob("*.json"))) if OUTPUT_DIR.exists() else 0
+    return {"total": total, "processed": processed}
+
+
+class BatchRunRequest(BaseModel):
+    limit: Optional[int] = None
+
+
+@app.post("/api/batch/run")
+async def run_batch(request: BatchRunRequest):
+    async def stream_progress():
+        json_files = sorted(list(JSON_DIR.glob("*.json"))) if JSON_DIR.exists() else []
+
+        if not json_files:
+            yield f"data: No JSON files found in {JSON_DIR}\n\n"
+            return
+
+        to_process = json_files
+        if request.limit:
+            to_process = json_files[: request.limit]
+
+        yield f"data: Found {len(json_files)} cases. Processing {len(to_process)}...\n\n"
+
+        processed_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        for json_file in to_process:
+            filename = json_file.name
+            output_file = OUTPUT_DIR / filename
+
+            if output_file.exists():
+                skipped_count += 1
+                yield f"data: Skipped {filename} (already processed)\n\n"
+                continue
+
+            try:
+                with open(json_file, "r") as f:
+                    data = json.load(f)
+
+                opinions = data.get("casebody", {}).get("opinions", [])
+                full_opinion = ""
+                for opinion in opinions:
+                    full_opinion += opinion.get("text", "")
+
+                yield f"data: Processing {filename}...\n\n"
+
+                async for _ in await stream_analysis(
+                    full_opinion, save_path=output_file
+                ):
+                    pass
+
+                processed_count += 1
+                yield f"data: Completed {filename}\n\n"
+
+            except Exception as e:
+                error_count += 1
+                yield f"data: Error processing {filename}: {e}\n\n"
+
+        yield f"data: Done. Processed: {processed_count}, Skipped: {skipped_count}, Errors: {error_count}\n\n"
+
+    return StreamingResponse(stream_progress(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":

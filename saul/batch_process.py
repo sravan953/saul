@@ -91,5 +91,5 @@ async def main(limit: int | None = None):
 
 if __name__ == "__main__":
     # Configure run here
-    LIMIT = 5  # Set to None for all
+    LIMIT = None  # Set to None for all
     asyncio.run(main(limit=LIMIT))

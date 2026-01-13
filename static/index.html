@@ -4,38 +4,109 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saul - Legal Analysis Copilot</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
-    <div class="container">
-        <!-- Left Column: File List -->
-        <div class="column left-column">
-            <h2>Cases</h2>
-            <div id="file-list" class="file-list">
-                <!-- Files will be populated here -->
+    <div class="app-container">
+        <!-- Collapsible Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">Saul</span>
+                <button class="sidebar-toggle" id="sidebar-toggle">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
             </div>
-        </div>
+            <div class="sidebar-nav">
+                <button class="nav-item active" data-view="case-browser">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    <span class="nav-label">Case Browser</span>
+                </button>
+                <button class="nav-item" data-view="case-extraction">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                    </svg>
+                    <span class="nav-label">Case Extraction</span>
+                </button>
+            </div>
+        </nav>
 
-        <!-- Middle Column: HTML Viewer -->
-        <div class="column middle-column">
-            <h2>Case View</h2>
-            <div id="html-viewer" class="html-viewer">
-                <iframe id="case-frame" title="Case Content"></iframe>
-            </div>
-        </div>
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Case Browser View -->
+            <div class="view active" id="case-browser-view">
+                <div class="container">
+                    <!-- Left Column: File List -->
+                    <div class="column left-column">
+                        <h2>Cases</h2>
+                        <div id="file-list" class="file-list">
+                            <!-- Files will be populated here -->
+                        </div>
+                    </div>
 
-        <!-- Right Column: Analysis -->
-        <div class="column right-column">
-            <div class="header-actions">
-                <h2>Analysis</h2>
-                <button id="run-btn" class="run-btn" disabled>Run Saul</button>
+                    <!-- Middle Column: HTML Viewer -->
+                    <div class="column middle-column">
+                        <h2>Case View</h2>
+                        <div id="html-viewer" class="html-viewer">
+                            <iframe id="case-frame" title="Case Content"></iframe>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Analysis -->
+                    <div class="column right-column">
+                        <div class="header-actions">
+                            <h2>Analysis</h2>
+                            <button id="run-btn" class="run-btn" disabled>Run Saul</button>
+                        </div>
+                        <div id="analysis-output" class="analysis-output">
+                            <pre id="output-text"></pre>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div id="analysis-output" class="analysis-output">
-                <pre id="output-text"></pre>
+
+            <!-- Case Extraction View -->
+            <div class="view" id="case-extraction-view">
+                <div class="extraction-container">
+                    <h1 class="extraction-title">Case Extraction</h1>
+                    <p class="extraction-subtitle">Process multiple cases in batch mode</p>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Cases</div>
+                            <div class="stat-value" id="total-cases">--</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Processed</div>
+                            <div class="stat-value" id="processed-cases">--</div>
+                        </div>
+                    </div>
+
+                    <div class="extraction-form">
+                        <div class="form-group">
+                            <label for="limit-input">Limit (optional)</label>
+                            <input type="number" id="limit-input" placeholder="Process all cases" min="1">
+                        </div>
+                        <button id="batch-run-btn" class="batch-run-btn">Run Saul in batch mode</button>
+                    </div>
+
+                    <div class="progress-section">
+                        <h3>Progress</h3>
+                        <div class="progress-bar-container" id="progress-bar-container">
+                            <div class="progress-bar" id="progress-bar"></div>
+                        </div>
+                        <div class="progress-stats" id="progress-stats"></div>
+                        <div class="progress-log" id="progress-log">
+                            <p class="placeholder-text">Click "Run Saul in batch mode" to start processing...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+        </main>
     </div>
-    <script src="/static/script.js"></script>
+    <script src="/static/script.js?v=2"></script>
 </body>
 </html>
-
