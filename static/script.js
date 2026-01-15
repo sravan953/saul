@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
         element.classList.add('selected');
         
         selectedFile = filename;
-        runBtn.disabled = false;
+        runBtn.disabled = true;
+        runBtn.textContent = 'Run Saul';
         
         // Load HTML content
         caseFrame.src = `/api/html/${filename}`;
@@ -83,12 +84,29 @@ document.addEventListener('DOMContentLoaded', () => {
             runBtn.textContent = 'Run Saul';
         }
 
-        // Auto-load cached analysis if available
-        fetch(`/api/output/${filename}`)
+        // Check if output JSON exists before enabling run
+        fetch(`/api/output/exists/${filename}`)
             .then(response => {
                 if (response.ok) {
-                    return response.text();
+                    return response.json();
                 }
+                return { exists: false };
+            })
+            .then(data => {
+                if (data.exists) {
+                    runBtn.disabled = true;
+                    runBtn.textContent = 'Already processed';
+                    return fetch(`/api/output/${filename}`)
+                        .then(response => {
+                            if (response.ok) {
+                                return response.text();
+                            }
+                            return null;
+                        });
+                }
+
+                runBtn.disabled = false;
+                runBtn.textContent = 'Run Saul';
                 return null;
             })
             .then(html => {
@@ -100,6 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(err => {
                 console.log('Cache check failed:', err);
+                runBtn.disabled = false;
+                runBtn.textContent = 'Run Saul';
             });
     }
 
@@ -117,11 +137,16 @@ document.addEventListener('DOMContentLoaded', () => {
         runBtn.textContent = 'Stop';
         abortController = new AbortController();
 
+        let analysisSucceeded = false;
         try {
             const response = await fetch(`/api/analyze/${selectedFile}`, {
                 method: 'POST',
                 signal: abortController.signal
             });
+
+            if (!response.ok) {
+                throw new Error(`Request failed (${response.status})`);
+            }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -138,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             outputText.innerHTML = html;
             const outputContainer = document.getElementById('analysis-output');
             outputContainer.scrollTop = outputContainer.scrollHeight;
+            analysisSucceeded = true;
         } catch (err) {
             if (err.name === 'AbortError') {
                 outputText.innerHTML += '<p>[Analysis stopped]</p>';
@@ -145,7 +171,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 outputText.innerHTML = `<p>Error: ${err.message}</p>`;
             }
         } finally {
-            runBtn.textContent = 'Run Saul';
+            if (analysisSucceeded) {
+                runBtn.disabled = true;
+                runBtn.textContent = 'Already processed';
+            } else {
+                runBtn.textContent = 'Run Saul';
+            }
             abortController = null;
         }
     };

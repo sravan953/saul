@@ -75,6 +75,12 @@ async def get_cached_output(filename: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/output/exists/{filename}")
+async def output_exists(filename: str):
+    output_file = OUTPUT_DIR / filename
+    return {"exists": output_file.exists()}
+
+
 @app.post("/api/analyze/{filename}")
 async def analyze_case(filename: str):
     json_file = JSON_DIR / filename
