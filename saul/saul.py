@@ -6,10 +6,10 @@ from typing import Optional
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from llm import OllamaNotRunningError, format_analysis_html, stream_analysis
+from llm import OllamaNotRunningError, format_analysis_html, get_case_analysis_stream
 from model import Analysis
 from pydantic import BaseModel
 
@@ -94,16 +94,9 @@ async def analyze_case(filename: str):
             print(f"Error reading cache: {e}")
 
     try:
-        with open(json_file, "r") as f:
-            data = json.load(f)
-
-        opinions = data.get("casebody", {}).get("opinions", [])
-        full_opinion = ""
-        for opinion in opinions:
-            full_opinion += opinion.get("text", "")
-
+        stream = await get_case_analysis_stream(json_file, output_file)
         return StreamingResponse(
-            await stream_analysis(full_opinion, save_path=output_file),
+            stream,
             media_type="text/html",
         )
 
@@ -147,25 +140,18 @@ async def run_batch(request: BatchRunRequest):
             filename = json_file.name
             output_file = OUTPUT_DIR / filename
 
-            if output_file.exists():
-                skipped_count += 1
-                yield f"data: Skipped {filename} (already processed)\n\n"
-                continue
-
             try:
-                with open(json_file, "r") as f:
-                    data = json.load(f)
-
-                opinions = data.get("casebody", {}).get("opinions", [])
-                full_opinion = ""
-                for opinion in opinions:
-                    full_opinion += opinion.get("text", "")
+                stream = await get_case_analysis_stream(
+                    json_file, output_file, skip_if_exists=True
+                )
+                if stream is None:
+                    skipped_count += 1
+                    yield f"data: Skipped {filename} (already processed)\n\n"
+                    continue
 
                 yield f"data: Processing {filename}...\n\n"
 
-                async for _ in await stream_analysis(
-                    full_opinion, save_path=output_file
-                ):
+                async for _ in stream:
                     pass
 
                 processed_count += 1

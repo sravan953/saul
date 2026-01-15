@@ -4,11 +4,10 @@ import os
 from pathlib import Path
 from typing import AsyncGenerator
 
-from loguru import logger
-
 import httpx
 import requests
 from dotenv import load_dotenv
+from loguru import logger
 from model import Analysis
 from ollama import AsyncClient
 from openai import OpenAI
@@ -32,6 +31,11 @@ Extract facts, reasonings, and conclusions from this case:
 
 class OllamaNotRunningError(Exception):
     pass
+
+
+def build_full_opinion(data: dict) -> str:
+    opinions = data.get("casebody", {}).get("opinions", [])
+    return "".join(opinion.get("text", "") for opinion in opinions)
 
 
 def format_analysis_html(analysis: Analysis) -> str:
@@ -79,8 +83,7 @@ async def call_ollama(
         full_response += chunk["message"]["content"]
     analysis = Analysis.model_validate_json(full_response)
     if save_path:
-        with open(save_path, "w") as f:
-            f.write(analysis.model_dump_json(indent=2))
+        save_path.write_text(analysis.model_dump_json(indent=2), encoding="utf-8")
     yield format_analysis_html(analysis)
 
 
@@ -108,8 +111,7 @@ def _call_openrouter(prompt: str, save_path: Path | None = None) -> str:
     content = data["choices"][0]["message"]["content"]
     analysis = Analysis.model_validate_json(content)
     if save_path:
-        with open(save_path, "w") as f:
-            f.write(analysis.model_dump_json(indent=2))
+        save_path.write_text(analysis.model_dump_json(indent=2), encoding="utf-8")
     return format_analysis_html(analysis)
 
 
@@ -134,8 +136,9 @@ def _call_openai(prompt: str, save_path: Path | None = None) -> str:
         text_format=Analysis,
     )
     if save_path:
-        with open(save_path, "w") as f:
-            f.write(response.output_parsed.model_dump_json(indent=2))
+        save_path.write_text(
+            response.output_parsed.model_dump_json(indent=2), encoding="utf-8"
+        )
     return format_analysis_html(response.output_parsed)
 
 
@@ -161,3 +164,14 @@ async def stream_analysis(
     else:
         await _check_ollama()
         return call_ollama(prompt, save_path)
+
+
+async def get_case_analysis_stream(
+    json_file: Path, output_file: Path, skip_if_exists: bool = False
+) -> AsyncGenerator[str, None] | None:
+    if skip_if_exists and output_file.exists():
+        return None
+
+    data = json.loads(json_file.read_text(encoding="utf-8"))
+    full_opinion = build_full_opinion(data)
+    return await stream_analysis(full_opinion, save_path=output_file)

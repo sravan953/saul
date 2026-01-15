@@ -1,11 +1,10 @@
 import asyncio
-import json
 import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent))
 
-from llm import stream_analysis
+from llm import get_case_analysis_stream
 from tqdm import tqdm
 
 # Data directories
@@ -25,21 +24,14 @@ async def process_case(json_file: Path):
     filename = json_file.name
     output_file = OUTPUT_DIR / filename
 
-    # Skip if already processed
-    if output_file.exists():
-        return "skipped"
-
     try:
-        with open(json_file, "r") as f:
-            data = json.load(f)
+        stream = await get_case_analysis_stream(
+            json_file, output_file, skip_if_exists=True
+        )
+        if stream is None:
+            return "skipped"
 
-        opinions = data.get("casebody", {}).get("opinions", [])
-        full_opinion = ""
-        for opinion in opinions:
-            full_opinion += opinion.get("text", "")
-
-        # stream_analysis is an async generator, we need to consume it to execute the logic
-        async for _ in await stream_analysis(full_opinion, save_path=output_file):
+        async for _ in stream:
             pass
 
         return "processed"
