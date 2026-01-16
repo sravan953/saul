@@ -9,7 +9,12 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from llm import OllamaNotRunningError, format_analysis_html, get_case_analysis_stream
+from llm import (
+    OllamaNotRunningError,
+    atomize_analysis,
+    format_analysis_html,
+    get_case_analysis_stream,
+)
 from model import Analysis
 from pydantic import BaseModel
 
@@ -22,10 +27,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "1"
 JSON_DIR = DATA_DIR / "json"
 HTML_DIR = DATA_DIR / "html"
-OUTPUT_DIR = DATA_DIR / "output"
+OUTPUT_STAGE1_DIR = DATA_DIR / "output_stage1"
+OUTPUT_STAGE2_DIR = DATA_DIR / "output_stage2"
 
-# Ensure output directory exists
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# Ensure output directories exist
+OUTPUT_STAGE1_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_STAGE2_DIR.mkdir(parents=True, exist_ok=True)
 
 # Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -58,7 +65,7 @@ async def get_html(filename: str):
 
 @app.get("/api/output/{filename}")
 async def get_cached_output(filename: str):
-    output_file = OUTPUT_DIR / filename
+    output_file = OUTPUT_STAGE1_DIR / filename
     if not output_file.exists():
         raise HTTPException(status_code=404, detail="Cached output not found")
 
@@ -77,7 +84,25 @@ async def get_cached_output(filename: str):
 
 @app.get("/api/output/exists/{filename}")
 async def output_exists(filename: str):
-    output_file = OUTPUT_DIR / filename
+    output_file = OUTPUT_STAGE1_DIR / filename
+    return {"exists": output_file.exists()}
+
+
+def _stage2_output_path(filename: str) -> Path:
+    return OUTPUT_STAGE2_DIR / f"{Path(filename).stem}.atomized.json"
+
+
+@app.get("/api/output_stage2/{filename}")
+async def get_stage2_output(filename: str):
+    output_file = _stage2_output_path(filename)
+    if not output_file.exists():
+        raise HTTPException(status_code=404, detail="Stage 2 output not found")
+    return json.loads(output_file.read_text(encoding="utf-8"))
+
+
+@app.get("/api/output_stage2/exists/{filename}")
+async def output_stage2_exists(filename: str):
+    output_file = _stage2_output_path(filename)
     return {"exists": output_file.exists()}
 
 
@@ -88,7 +113,7 @@ async def analyze_case(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     # Check for cached output
-    output_file = OUTPUT_DIR / filename
+    output_file = OUTPUT_STAGE1_DIR / filename
     if output_file.exists():
         try:
             with open(output_file, "r") as f:
@@ -115,8 +140,23 @@ async def analyze_case(filename: str):
 @app.get("/api/batch/status")
 async def batch_status():
     total = len(list(JSON_DIR.glob("*.json"))) if JSON_DIR.exists() else 0
-    processed = len(list(OUTPUT_DIR.glob("*.json"))) if OUTPUT_DIR.exists() else 0
-    return {"total": total, "processed": processed}
+    stage1_processed = (
+        len(list(OUTPUT_STAGE1_DIR.glob("*.json"))) if OUTPUT_STAGE1_DIR.exists() else 0
+    )
+    stage2_processed = (
+        len(list(OUTPUT_STAGE2_DIR.glob("*.atomized.json")))
+        if OUTPUT_STAGE2_DIR.exists()
+        else 0
+    )
+    stage1_complete = total > 0 and stage1_processed >= total
+    stage2_complete = total > 0 and stage2_processed >= total
+    return {
+        "total": total,
+        "stage1_processed": stage1_processed,
+        "stage2_processed": stage2_processed,
+        "stage1_complete": stage1_complete,
+        "stage2_complete": stage2_complete,
+    }
 
 
 class BatchRunRequest(BaseModel):
@@ -144,7 +184,7 @@ async def run_batch(request: BatchRunRequest):
 
         for json_file in to_process:
             filename = json_file.name
-            output_file = OUTPUT_DIR / filename
+            output_file = OUTPUT_STAGE1_DIR / filename
 
             try:
                 stream = await get_case_analysis_stream(
@@ -168,6 +208,88 @@ async def run_batch(request: BatchRunRequest):
                 yield f"data: Error processing {filename}: {e}\n\n"
 
         yield f"data: Done. Processed: {processed_count}, Skipped: {skipped_count}, Errors: {error_count}\n\n"
+
+    return StreamingResponse(stream_progress(), media_type="text/event-stream")
+
+
+@app.post("/api/analyze_stage2/{filename}")
+async def analyze_case_stage2(filename: str):
+    json_file = JSON_DIR / filename
+    if not json_file.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    stage1_file = OUTPUT_STAGE1_DIR / filename
+    if not stage1_file.exists():
+        raise HTTPException(
+            status_code=409, detail="Stage 1 output not found for this case"
+        )
+
+    output_file = _stage2_output_path(filename)
+    if output_file.exists():
+        return json.loads(output_file.read_text(encoding="utf-8"))
+
+    try:
+        data = json.loads(stage1_file.read_text(encoding="utf-8"))
+        analysis = Analysis.model_validate(data)
+        atomized = await atomize_analysis(analysis, save_path=output_file)
+        return atomized.model_dump()
+    except OllamaNotRunningError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/batch/run-stage2")
+async def run_batch_stage2(request: BatchRunRequest):
+    async def stream_progress():
+        json_files = sorted(list(JSON_DIR.glob("*.json"))) if JSON_DIR.exists() else []
+
+        if not json_files:
+            yield f"data: No JSON files found in {JSON_DIR}\n\n"
+            return
+
+        to_process = json_files
+        if request.limit:
+            to_process = json_files[: request.limit]
+
+        yield f"data: Found {len(json_files)} cases. Processing {len(to_process)}...\n\n"
+
+        processed_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        for json_file in to_process:
+            filename = json_file.name
+            stage1_file = OUTPUT_STAGE1_DIR / filename
+            output_file = _stage2_output_path(filename)
+
+            if not stage1_file.exists():
+                skipped_count += 1
+                yield f"data: Skipped {filename} (stage 1 missing)\n\n"
+                continue
+
+            if output_file.exists():
+                skipped_count += 1
+                yield f"data: Skipped {filename} (already processed)\n\n"
+                continue
+
+            try:
+                data = json.loads(stage1_file.read_text(encoding="utf-8"))
+                analysis = Analysis.model_validate(data)
+                yield f"data: Processing {filename}...\n\n"
+
+                await atomize_analysis(analysis, save_path=output_file)
+
+                processed_count += 1
+                yield f"data: Completed {filename}\n\n"
+            except Exception as e:
+                error_count += 1
+                yield f"data: Error processing {filename}: {e}\n\n"
+
+        yield (
+            f"data: Done. Processed: {processed_count}, Skipped: {skipped_count}, "
+            f"Errors: {error_count}\n\n"
+        )
 
     return StreamingResponse(stream_progress(), media_type="text/event-stream")
 

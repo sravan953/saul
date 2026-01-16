@@ -41,7 +41,7 @@
                 <div class="container">
                     <!-- Left Column: File List -->
                     <div class="column left-column">
-                        <h2>Cases</h2>
+                        <h2>Case List</h2>
                         <div id="file-list" class="file-list">
                             <!-- Files will be populated here -->
                         </div>
@@ -58,11 +58,29 @@
                     <!-- Right Column: Analysis -->
                     <div class="column right-column">
                         <div class="header-actions">
-                            <h2>Analysis</h2>
-                            <button id="run-btn" class="run-btn" disabled>Run Saul</button>
+                            <h2>Case Analysis</h2>
+                            <div class="action-buttons">
+                                <button id="run-btn" class="run-btn" disabled>
+                                    Run stage 1 case extraction
+                                </button>
+                                <button id="run-stage2-btn" class="run-btn" disabled>
+                                    Run stage 2 case extraction
+                                </button>
+                            </div>
                         </div>
                         <div id="analysis-output" class="analysis-output">
-                            <pre id="output-text"></pre>
+                            <div class="analysis-tabs" role="tablist" aria-label="Analysis stages">
+                                <button id="tab-stage1" class="analysis-tab active" role="tab">
+                                    Stage 1
+                                </button>
+                                <button id="tab-stage2" class="analysis-tab" role="tab">
+                                    Stage 2
+                                </button>
+                            </div>
+                            <div class="analysis-panels">
+                                <div id="stage1-output" class="analysis-panel active" role="tabpanel"></div>
+                                <div id="stage2-output" class="analysis-panel" role="tabpanel"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -90,7 +108,12 @@
                             <label for="limit-input">Limit (optional)</label>
                             <input type="number" id="limit-input" placeholder="Process all cases" min="1">
                         </div>
-                        <button id="batch-run-btn" class="batch-run-btn">Run Saul in batch mode</button>
+                        <button id="batch-run-btn" class="batch-run-btn">
+                            Run stage 1 batch extraction
+                        </button>
+                        <button id="batch-run-stage2-btn" class="batch-run-btn" disabled>
+                            Run stage 2 batch extraction
+                        </button>
                     </div>
 
                     <div class="progress-section">
@@ -100,7 +123,7 @@
                         </div>
                         <div class="progress-stats" id="progress-stats"></div>
                         <div class="progress-log" id="progress-log">
-                            <p class="placeholder-text">Click "Run Saul in batch mode" to start processing...</p>
+                            <p class="placeholder-text">Click "Run stage 1 batch extraction" to start processing...</p>
                         </div>
                     </div>
                 </div>

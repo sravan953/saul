@@ -8,7 +8,7 @@ import httpx
 import requests
 from dotenv import load_dotenv
 from loguru import logger
-from model import Analysis
+from model import Analysis, AtomizedCaseOutput
 from ollama import AsyncClient
 from openai import OpenAI
 
@@ -26,6 +26,15 @@ PROMPT_TEMPLATE = """
 Extract facts, reasonings, and conclusions from this case:
 
 {text}
+"""
+
+ATOMIZE_PROMPT_TEMPLATE = """
+You are given the facts, reasonings, and outcomes from a case.
+Classify the case as criminal or civil, then return JSON that matches the schema.
+Set only the matching object (criminal or civil) and set the other to null.
+
+Facts, reasonings, and outcomes:
+{stage1_json}
 """
 
 
@@ -87,6 +96,21 @@ async def call_ollama(
     yield format_analysis_html(analysis)
 
 
+async def _call_ollama_atomize(prompt: str) -> AtomizedCaseOutput:
+    client = AsyncClient()
+    stream = await client.chat(
+        model=OLLAMA_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        format=AtomizedCaseOutput.model_json_schema(),
+        options={"temperature": 0},
+        stream=True,
+    )
+    full_response = ""
+    async for chunk in stream:
+        full_response += chunk["message"]["content"]
+    return AtomizedCaseOutput.model_validate_json(full_response)
+
+
 def _call_openrouter(prompt: str, save_path: Path | None = None) -> str:
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -115,6 +139,34 @@ def _call_openrouter(prompt: str, save_path: Path | None = None) -> str:
     return format_analysis_html(analysis)
 
 
+def _call_openrouter_atomize(prompt: str) -> AtomizedCaseOutput:
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Respond only with valid JSON matching this schema: "
+                    f"{json.dumps(AtomizedCaseOutput.model_json_schema())}"
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0,
+    }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=120)
+    response.raise_for_status()
+    data = response.json()
+    content = data["choices"][0]["message"]["content"]
+    return AtomizedCaseOutput.model_validate_json(content)
+
+
 async def call_openrouter(
     prompt: str, save_path: Path | None = None
 ) -> AsyncGenerator[str, None]:
@@ -140,6 +192,25 @@ def _call_openai(prompt: str, save_path: Path | None = None) -> str:
             response.output_parsed.model_dump_json(indent=2), encoding="utf-8"
         )
     return format_analysis_html(response.output_parsed)
+
+
+def _call_openai_atomize(prompt: str) -> AtomizedCaseOutput:
+    client = OpenAI()
+    response = client.responses.parse(
+        model=OPENAI_MODEL,
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "Classify the case as criminal or civil and respond with JSON "
+                    "matching the provided schema."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        text_format=AtomizedCaseOutput,
+    )
+    return response.output_parsed
 
 
 async def call_openai(
@@ -175,3 +246,24 @@ async def get_case_analysis_stream(
     data = json.loads(json_file.read_text(encoding="utf-8"))
     full_opinion = build_full_opinion(data)
     return await stream_analysis(full_opinion, save_path=output_file)
+
+
+async def atomize_analysis(
+    analysis: Analysis, save_path: Path | None = None
+) -> AtomizedCaseOutput:
+    prompt = ATOMIZE_PROMPT_TEMPLATE.format(
+        stage1_json=analysis.model_dump_json(indent=2)
+    )
+    logger.info(f"Using LLM provider for stage 2: {LLM_PROVIDER}")
+
+    if LLM_PROVIDER == "openrouter":
+        atomized = await asyncio.to_thread(_call_openrouter_atomize, prompt)
+    elif LLM_PROVIDER == "openai":
+        atomized = await asyncio.to_thread(_call_openai_atomize, prompt)
+    else:
+        await _check_ollama()
+        atomized = await _call_ollama_atomize(prompt)
+
+    if save_path:
+        save_path.write_text(atomized.model_dump_json(indent=2), encoding="utf-8")
+    return atomized

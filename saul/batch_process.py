@@ -14,7 +14,7 @@ from tqdm import tqdm
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "1"
 JSON_DIR = DATA_DIR / "json"
-OUTPUT_DIR = DATA_DIR / "output"
+OUTPUT_STAGE1_DIR = DATA_DIR / "output_stage1"
 
 
 async def process_case(json_file: Path):
@@ -22,7 +22,7 @@ async def process_case(json_file: Path):
     Process a single case file: read JSON, extract text, run analysis, save output.
     """
     filename = json_file.name
-    output_file = OUTPUT_DIR / filename
+    output_file = OUTPUT_STAGE1_DIR / filename
 
     try:
         stream = await get_case_analysis_stream(
@@ -43,7 +43,7 @@ async def process_case(json_file: Path):
 
 async def main(limit: int | None = None):
     # Ensure output directory exists
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_STAGE1_DIR.mkdir(parents=True, exist_ok=True)
 
     json_files = sorted(list(JSON_DIR.glob("*.json")))
 
