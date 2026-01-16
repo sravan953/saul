@@ -22,7 +22,7 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     height: 100vh;
-    overflow: hidden;
+    overflow: auto;
 }
 
 /* App Container */
@@ -138,12 +138,13 @@ body {
 /* Main Content */
 .main-content {
     flex: 1;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .view {
     display: none;
     height: 100%;
+    overflow: auto;
 }
 
 .view.active {
