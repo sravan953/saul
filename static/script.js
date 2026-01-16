@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let batchAbortController = null;
     let stage2AbortController = null;
     let batchStage2AbortController = null;
+    let statusAbortController = null;
 
     runStage2Btn.hidden = true;
     tabStage1.disabled = true;
@@ -179,16 +180,23 @@ document.addEventListener('DOMContentLoaded', () => {
             stage2AbortController.abort();
             stage2AbortController = null;
         }
+        if (statusAbortController) {
+            statusAbortController.abort();
+            statusAbortController = null;
+        }
 
         // Check stage 1 + stage 2 outputs before enabling run
+        const currentFile = filename;
+        statusAbortController = new AbortController();
+        const { signal } = statusAbortController;
         Promise.all([
-            fetch(`/api/output/exists/${filename}`).then(response => {
+            fetch(`/api/output/exists/${filename}`, { signal }).then(response => {
                 if (response.ok) {
                     return response.json();
                 }
                 return { exists: false };
             }),
-            fetch(`/api/output_stage2/exists/${filename}`).then(response => {
+            fetch(`/api/output_stage2/exists/${filename}`, { signal }).then(response => {
                 if (response.ok) {
                     return response.json();
                 }
@@ -196,6 +204,9 @@ document.addEventListener('DOMContentLoaded', () => {
             })
         ])
             .then(([stage1Status, stage2Status]) => {
+                if (signal.aborted || selectedFile !== currentFile) {
+                    return null;
+                }
                 const hasStage1 = stage1Status.exists === true;
                 const hasStage2 = stage2Status.exists === true;
 
@@ -212,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const stage1Fetch = hasStage1
-                    ? fetch(`/api/output/${filename}`).then(response => {
+                    ? fetch(`/api/output/${filename}`, { signal }).then(response => {
                           if (response.ok) {
                               return response.text();
                           }
@@ -221,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     : Promise.resolve(null);
 
                 const stage2Fetch = hasStage2
-                    ? fetch(`/api/output_stage2/${filename}`).then(response => {
+                    ? fetch(`/api/output_stage2/${filename}`, { signal }).then(response => {
                           if (response.ok) {
                               return response.json();
                           }
@@ -230,6 +241,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     : Promise.resolve(null);
 
                 return Promise.all([stage1Fetch, stage2Fetch]).then(([html, stage2]) => {
+                    if (signal.aborted || selectedFile !== currentFile) {
+                        return null;
+                    }
                     return { html, stage2, hasStage1, hasStage2 };
                 });
             })
@@ -256,6 +270,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 outputContainer.scrollTop = outputContainer.scrollHeight;
             })
             .catch(err => {
+                if (err.name === 'AbortError') {
+                    return;
+                }
                 console.log('Cache check failed:', err);
                 runBtn.disabled = false;
                 runBtn.textContent = 'Run stage 1 case extraction';
