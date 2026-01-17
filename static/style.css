@@ -728,14 +728,28 @@ h2 {
     background: white;
     border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    flex-wrap: wrap;
 }
 
-.atlas-filter-bar label {
+.atlas-filter-bar > label {
     font-weight: 600;
     color: var(--accent-color);
 }
 
-.atlas-filter-bar select {
+.atlas-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.atlas-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.atlas-filter-select {
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -745,9 +759,44 @@ h2 {
     min-width: 200px;
 }
 
-.atlas-filter-bar select:focus {
+.atlas-filter-select:focus {
     outline: none;
     border-color: var(--accent-color);
+}
+
+.atlas-filter-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.atlas-add-btn {
+    background: var(--accent-color);
+    color: white;
+}
+
+.atlas-add-btn:hover {
+    background: #1a252f;
+    transform: scale(1.1);
+}
+
+.atlas-remove-btn {
+    background: #e74c3c;
+    color: white;
+}
+
+.atlas-remove-btn:hover {
+    background: #c0392b;
+    transform: scale(1.1);
 }
 
 .atlas-content {

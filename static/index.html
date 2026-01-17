@@ -144,29 +144,11 @@
                         <p class="atlas-subtitle">Explore and cluster cases by attributes</p>
                     </div>
                     <div class="atlas-filter-bar">
-                        <label for="atlas-group-select">Group by:</label>
-                        <select id="atlas-group-select">
-                            <optgroup label="General">
-                                <option value="case_type">Case Type</option>
-                            </optgroup>
-                            <optgroup label="Criminal">
-                                <option value="offense_severity">Offense Severity</option>
-                                <option value="charges">Charges</option>
-                                <option value="weapon_type">Weapon Type</option>
-                                <option value="victim_count">Victim Count</option>
-                                <option value="evidence_types">Evidence Types</option>
-                                <option value="aggravating_factors">Aggravating Factors</option>
-                                <option value="prior_record_severity">Prior Record Severity</option>
-                            </optgroup>
-                            <optgroup label="Civil">
-                                <option value="cause_of_action">Cause of Action</option>
-                                <option value="duty_of_care_source">Duty of Care Source</option>
-                                <option value="breach_description">Breach Description</option>
-                                <option value="proximate_causation_score">Proximate Causation Score</option>
-                                <option value="damages_claimed">Damages Claimed</option>
-                                <option value="is_settlement">Settlement</option>
-                            </optgroup>
-                        </select>
+                        <label>Group by:</label>
+                        <div id="atlas-filters" class="atlas-filters">
+                            <!-- Filters will be added dynamically -->
+                        </div>
+                        <button id="atlas-add-filter" class="atlas-filter-btn atlas-add-btn" title="Add filter">+</button>
                     </div>
                     <div id="atlas-content" class="atlas-content">
                         <p class="atlas-placeholder">Loading cases...</p>

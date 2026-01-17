@@ -111,9 +111,94 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Case Atlas elements
-    const atlasGroupSelect = document.getElementById('atlas-group-select');
+    const atlasFiltersContainer = document.getElementById('atlas-filters');
+    const atlasAddFilterBtn = document.getElementById('atlas-add-filter');
     const atlasContent = document.getElementById('atlas-content');
     let atlasCases = [];
+    let atlasFilterCount = 0;
+
+    const FILTER_OPTIONS_HTML = `
+        <optgroup label="General">
+            <option value="case_type">Case Type</option>
+        </optgroup>
+        <optgroup label="Criminal">
+            <option value="offense_severity">Offense Severity</option>
+            <option value="charges">Charges</option>
+            <option value="weapon_type">Weapon Type</option>
+            <option value="victim_count">Victim Count</option>
+            <option value="evidence_types">Evidence Types</option>
+            <option value="aggravating_factors">Aggravating Factors</option>
+            <option value="prior_record_severity">Prior Record Severity</option>
+        </optgroup>
+        <optgroup label="Civil">
+            <option value="cause_of_action">Cause of Action</option>
+            <option value="duty_of_care_source">Duty of Care Source</option>
+            <option value="breach_description">Breach Description</option>
+            <option value="proximate_causation_score">Proximate Causation Score</option>
+            <option value="damages_claimed">Damages Claimed</option>
+            <option value="is_settlement">Settlement</option>
+        </optgroup>
+    `;
+
+    function createFilterElement(filterId, showRemove = false) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'atlas-filter-item';
+        wrapper.dataset.filterId = filterId;
+
+        const select = document.createElement('select');
+        select.className = 'atlas-filter-select';
+        select.innerHTML = FILTER_OPTIONS_HTML;
+        select.addEventListener('change', onAtlasFilterChange);
+
+        wrapper.appendChild(select);
+
+        if (showRemove) {
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'atlas-filter-btn atlas-remove-btn';
+            removeBtn.title = 'Remove filter';
+            removeBtn.textContent = '−';
+            removeBtn.addEventListener('click', () => removeAtlasFilter(filterId));
+            wrapper.appendChild(removeBtn);
+        }
+
+        return wrapper;
+    }
+
+    function addAtlasFilter() {
+        atlasFilterCount++;
+        const isFirst = atlasFiltersContainer.children.length === 0;
+        const filterEl = createFilterElement(atlasFilterCount, !isFirst);
+        atlasFiltersContainer.appendChild(filterEl);
+        
+        onAtlasFilterChange();
+    }
+
+    function removeAtlasFilter(filterId) {
+        const filterEl = atlasFiltersContainer.querySelector(`[data-filter-id="${filterId}"]`);
+        if (filterEl) {
+            filterEl.remove();
+        }
+        onAtlasFilterChange();
+    }
+
+    function getActiveFilters() {
+        const filters = [];
+        atlasFiltersContainer.querySelectorAll('.atlas-filter-select').forEach(select => {
+            filters.push(select.value);
+        });
+        return filters;
+    }
+
+    function onAtlasFilterChange() {
+        if (atlasCases.length) {
+            atlasContent.innerHTML = '';
+            setTimeout(() => renderAtlasGrid(getActiveFilters()), 50);
+        }
+    }
+
+    // Initialize first filter and add button handler
+    addAtlasFilter();
+    atlasAddFilterBtn.addEventListener('click', addAtlasFilter);
 
     // View switching
     navItems.forEach(item => {
@@ -643,7 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 atlasContent.innerHTML = '<p class="atlas-placeholder">No stage 2 outputs found. Run stage 2 extraction first.</p>';
                 return;
             }
-            renderAtlasGrid(atlasGroupSelect.value);
+            renderAtlasGrid(getActiveFilters());
         } catch (err) {
             atlasContent.innerHTML = `<p class="atlas-placeholder">Error loading cases: ${escapeHtml(err.message)}</p>`;
         }
@@ -700,15 +785,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const CRIMINAL_FIELDS = ['offense_severity', 'charges', 'weapon_type', 'victim_count', 'evidence_types', 'aggravating_factors', 'prior_record_severity'];
     const CIVIL_FIELDS = ['cause_of_action', 'duty_of_care_source', 'breach_description', 'proximate_causation_score', 'damages_claimed', 'is_settlement'];
 
-    function renderAtlasGrid(groupByField) {
+    function renderAtlasGrid(filters) {
         const groups = {};
+        const groupByField = filters[0]; // First filter is the grouping field
         
-        // Filter cases based on selected field type
+        // Filter cases based on all selected field types
         let filteredCases = atlasCases;
-        if (CRIMINAL_FIELDS.includes(groupByField)) {
-            filteredCases = atlasCases.filter(c => c.case_type === 'criminal');
-        } else if (CIVIL_FIELDS.includes(groupByField)) {
-            filteredCases = atlasCases.filter(c => c.case_type === 'civil');
+        
+        // Apply case type filtering based on all filters
+        const hasCriminalFilter = filters.some(f => CRIMINAL_FIELDS.includes(f));
+        const hasCivilFilter = filters.some(f => CIVIL_FIELDS.includes(f));
+        
+        if (hasCriminalFilter && !hasCivilFilter) {
+            filteredCases = filteredCases.filter(c => c.case_type === 'criminal');
+        } else if (hasCivilFilter && !hasCriminalFilter) {
+            filteredCases = filteredCases.filter(c => c.case_type === 'civil');
+        } else if (hasCriminalFilter && hasCivilFilter) {
+            // Both criminal and civil filters - no cases can match both types
+            filteredCases = [];
         }
         
         filteredCases.forEach(caseData => {
@@ -817,11 +911,4 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // Atlas filter change handler
-    atlasGroupSelect.addEventListener('change', () => {
-        if (atlasCases.length) {
-            atlasContent.innerHTML = '';
-            setTimeout(() => renderAtlasGrid(atlasGroupSelect.value), 50);
-        }
-    });
 });
