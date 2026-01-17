@@ -110,6 +110,11 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar.classList.toggle('collapsed');
     });
 
+    // Case Atlas elements
+    const atlasGroupSelect = document.getElementById('atlas-group-select');
+    const atlasContent = document.getElementById('atlas-content');
+    let atlasCases = [];
+
     // View switching
     navItems.forEach(item => {
         item.addEventListener('click', () => {
@@ -126,6 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Load batch status when switching to extraction view
             if (viewId === 'case-extraction') {
                 loadBatchStatus();
+            }
+            // Load atlas when switching to atlas view
+            if (viewId === 'case-atlas') {
+                loadAtlasCases();
             }
         });
     });
@@ -620,4 +629,199 @@ document.addEventListener('DOMContentLoaded', () => {
             loadBatchStatus();
         }
     };
+
+    // Case Atlas functions
+    async function loadAtlasCases() {
+        atlasContent.innerHTML = '<p class="atlas-placeholder">Loading cases...</p>';
+        try {
+            const response = await fetch('/api/atlas/cases');
+            if (!response.ok) {
+                throw new Error('Failed to load cases');
+            }
+            atlasCases = await response.json();
+            if (atlasCases.length === 0) {
+                atlasContent.innerHTML = '<p class="atlas-placeholder">No stage 2 outputs found. Run stage 2 extraction first.</p>';
+                return;
+            }
+            renderAtlasGrid(atlasGroupSelect.value);
+        } catch (err) {
+            atlasContent.innerHTML = `<p class="atlas-placeholder">Error loading cases: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    function getFieldValue(caseData, field) {
+        if (field === 'case_type') {
+            return caseData.case_type || 'Unknown';
+        }
+        if (caseData.criminal && field in caseData.criminal) {
+            return caseData.criminal[field];
+        }
+        if (caseData.civil && field in caseData.civil) {
+            return caseData.civil[field];
+        }
+        return null;
+    }
+
+    function formatFieldValue(value, field) {
+        if (value === null || value === undefined) {
+            return 'N/A';
+        }
+        if (typeof value === 'boolean') {
+            return value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            return value.length ? value.join(', ') : 'None';
+        }
+        // Bucket numeric fields
+        if (field === 'victim_count') {
+            const n = Number(value);
+            if (n === 0) return '0 victims';
+            if (n === 1) return '1 victim';
+            if (n <= 5) return '2-5 victims';
+            return '6+ victims';
+        }
+        if (field === 'proximate_causation_score') {
+            const n = Number(value);
+            if (n <= 0.25) return 'Low (0-25%)';
+            if (n <= 0.5) return 'Medium (26-50%)';
+            if (n <= 0.75) return 'High (51-75%)';
+            return 'Very High (76-100%)';
+        }
+        if (field === 'damages_claimed') {
+            const n = Number(value);
+            if (n < 10000) return 'Under $10K';
+            if (n < 100000) return '$10K - $100K';
+            if (n < 1000000) return '$100K - $1M';
+            return 'Over $1M';
+        }
+        return String(value);
+    }
+
+    const CRIMINAL_FIELDS = ['offense_severity', 'charges', 'weapon_type', 'victim_count', 'evidence_types', 'aggravating_factors', 'prior_record_severity'];
+    const CIVIL_FIELDS = ['cause_of_action', 'duty_of_care_source', 'breach_description', 'proximate_causation_score', 'damages_claimed', 'is_settlement'];
+
+    function renderAtlasGrid(groupByField) {
+        const groups = {};
+        
+        // Filter cases based on selected field type
+        let filteredCases = atlasCases;
+        if (CRIMINAL_FIELDS.includes(groupByField)) {
+            filteredCases = atlasCases.filter(c => c.case_type === 'criminal');
+        } else if (CIVIL_FIELDS.includes(groupByField)) {
+            filteredCases = atlasCases.filter(c => c.case_type === 'civil');
+        }
+        
+        filteredCases.forEach(caseData => {
+            let value = getFieldValue(caseData, groupByField);
+            
+            // Handle array fields - case appears in multiple groups
+            if (Array.isArray(value) && value.length > 0) {
+                value.forEach(v => {
+                    const groupKey = formatFieldValue(v, groupByField);
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = [];
+                    }
+                    if (!groups[groupKey].includes(caseData)) {
+                        groups[groupKey].push(caseData);
+                    }
+                });
+            } else {
+                const groupKey = formatFieldValue(value, groupByField);
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                }
+                groups[groupKey].push(caseData);
+            }
+        });
+
+        const sortedKeys = Object.keys(groups).sort((a, b) => {
+            if (a === 'N/A') return 1;
+            if (b === 'N/A') return -1;
+            return a.localeCompare(b);
+        });
+
+        let html = '';
+        sortedKeys.forEach((groupKey, idx) => {
+            const cases = groups[groupKey];
+            html += `
+                <div class="atlas-group" style="animation-delay: ${idx * 0.05}s">
+                    <div class="atlas-group-header">
+                        <h3 class="atlas-group-title">${escapeHtml(groupKey)}</h3>
+                        <span class="atlas-group-count">${cases.length} case${cases.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="atlas-grid">
+                        ${cases.map(c => renderAtlasCard(c)).join('')}
+                    </div>
+                </div>
+            `;
+        });
+
+        atlasContent.innerHTML = html;
+
+        // Add click handlers to cards
+        atlasContent.querySelectorAll('.atlas-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.atlas-card-close')) {
+                    card.classList.remove('expanded');
+                    return;
+                }
+                if (!card.classList.contains('expanded')) {
+                    atlasContent.querySelectorAll('.atlas-card.expanded').forEach(c => c.classList.remove('expanded'));
+                    card.classList.add('expanded');
+                }
+            });
+        });
+    }
+
+    function renderAtlasCard(caseData) {
+        const caseType = caseData.case_type ? caseData.case_type.toUpperCase() : 'UNKNOWN';
+        const filename = caseData.filename || 'Unknown';
+        
+        // Build preview pills (first few key fields)
+        let previewPills = [];
+        if (caseData.criminal) {
+            if (caseData.criminal.offense_severity) {
+                previewPills.push(caseData.criminal.offense_severity);
+            }
+            if (caseData.criminal.charges && caseData.criminal.charges.length) {
+                previewPills.push(caseData.criminal.charges[0]);
+            }
+        }
+        if (caseData.civil) {
+            if (caseData.civil.cause_of_action) {
+                previewPills.push(caseData.civil.cause_of_action);
+            }
+            if (caseData.civil.is_settlement) {
+                previewPills.push('Settlement');
+            }
+        }
+        previewPills = previewPills.slice(0, 3);
+
+        const previewHtml = previewPills.length
+            ? previewPills.map(p => `<span class="stage2-pill">${escapeHtml(p)}</span>`).join('')
+            : '<span class="stage2-muted">No details</span>';
+
+        // Build detail view (reuse stage2 formatting)
+        const detailHtml = formatStage2Output(caseData);
+
+        return `
+            <div class="atlas-card" data-filename="${escapeHtml(filename)}">
+                <div class="atlas-card-header">
+                    <span class="atlas-card-filename">${escapeHtml(filename.replace('.json', ''))}</span>
+                    <span class="atlas-card-badge">${escapeHtml(caseType)}</span>
+                    <button class="atlas-card-close" title="Close">&times;</button>
+                </div>
+                <div class="atlas-card-preview">${previewHtml}</div>
+                <div class="atlas-card-detail">${detailHtml}</div>
+            </div>
+        `;
+    }
+
+    // Atlas filter change handler
+    atlasGroupSelect.addEventListener('change', () => {
+        if (atlasCases.length) {
+            atlasContent.innerHTML = '';
+            setTimeout(() => renderAtlasGrid(atlasGroupSelect.value), 50);
+        }
+    });
 });

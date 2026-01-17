@@ -239,6 +239,22 @@ async def analyze_case_stage2(filename: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/atlas/cases")
+async def get_atlas_cases():
+    """Return all stage 2 outputs with filenames for the Case Atlas view."""
+    cases = []
+    if OUTPUT_STAGE2_DIR.exists():
+        for output_file in sorted(OUTPUT_STAGE2_DIR.glob("*.atomized.json")):
+            try:
+                data = json.loads(output_file.read_text(encoding="utf-8"))
+                # Reconstruct original filename from atomized filename
+                filename = output_file.stem.replace(".atomized", "") + ".json"
+                cases.append({"filename": filename, **data})
+            except Exception:
+                continue
+    return cases
+
+
 @app.post("/api/batch/run-stage2")
 async def run_batch_stage2(request: BatchRunRequest):
     async def stream_progress():

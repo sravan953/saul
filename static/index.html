@@ -31,6 +31,13 @@
                     </svg>
                     <span class="nav-label">Case Extraction</span>
                 </button>
+                <button class="nav-item" data-view="case-atlas">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                    </svg>
+                    <span class="nav-label">Case Atlas</span>
+                </button>
             </div>
         </nav>
 
@@ -125,6 +132,44 @@
                         <div class="progress-log" id="progress-log">
                             <p class="placeholder-text">Click "Run stage 1 batch extraction" to start processing...</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Case Atlas View -->
+            <div class="view" id="case-atlas-view">
+                <div class="atlas-container">
+                    <div class="atlas-header">
+                        <h1 class="atlas-title">Case Atlas</h1>
+                        <p class="atlas-subtitle">Explore and cluster cases by attributes</p>
+                    </div>
+                    <div class="atlas-filter-bar">
+                        <label for="atlas-group-select">Group by:</label>
+                        <select id="atlas-group-select">
+                            <optgroup label="General">
+                                <option value="case_type">Case Type</option>
+                            </optgroup>
+                            <optgroup label="Criminal">
+                                <option value="offense_severity">Offense Severity</option>
+                                <option value="charges">Charges</option>
+                                <option value="weapon_type">Weapon Type</option>
+                                <option value="victim_count">Victim Count</option>
+                                <option value="evidence_types">Evidence Types</option>
+                                <option value="aggravating_factors">Aggravating Factors</option>
+                                <option value="prior_record_severity">Prior Record Severity</option>
+                            </optgroup>
+                            <optgroup label="Civil">
+                                <option value="cause_of_action">Cause of Action</option>
+                                <option value="duty_of_care_source">Duty of Care Source</option>
+                                <option value="breach_description">Breach Description</option>
+                                <option value="proximate_causation_score">Proximate Causation Score</option>
+                                <option value="damages_claimed">Damages Claimed</option>
+                                <option value="is_settlement">Settlement</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div id="atlas-content" class="atlas-content">
+                        <p class="atlas-placeholder">Loading cases...</p>
                     </div>
                 </div>
             </div>
