@@ -851,6 +851,46 @@ h2 {
     font-weight: 700;
 }
 
+.atlas-group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.atlas-subgroup {
+    margin-left: 24px;
+    padding-left: 16px;
+    border-left: 3px solid var(--border-color);
+    animation: atlasGroupFadeIn 0.3s ease;
+}
+
+.atlas-subgroup .atlas-group-header {
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.atlas-subgroup .atlas-group-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.atlas-subgroup .atlas-group-count {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+}
+
+.atlas-subgroup .atlas-subgroup {
+    margin-left: 20px;
+    border-left-color: rgba(44, 62, 80, 0.2);
+}
+
+.atlas-subgroup .atlas-subgroup .atlas-group-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
 .atlas-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

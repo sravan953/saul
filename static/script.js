@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (showRemove) {
             const removeBtn = document.createElement('button');
             removeBtn.className = 'atlas-filter-btn atlas-remove-btn';
-            removeBtn.title = 'Remove filter';
+            removeBtn.title = 'Remove grouping';
             removeBtn.textContent = '−';
             removeBtn.addEventListener('click', () => removeAtlasFilter(filterId));
             wrapper.appendChild(removeBtn);
@@ -841,14 +841,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(value);
     }
 
+    function hasValidValue(value) {
+        if (value === null || value === undefined) return false;
+        if (Array.isArray(value)) return value.length > 0;
+        if (typeof value === 'string') return value.trim() !== '';
+        return true;
+    }
+
     function renderAtlasGrid(filters) {
-        const groups = {};
-        const groupByField = filters[0]; // First filter is the grouping field
-        
-        // Filter cases based on all selected field types
+        // Filter cases based on case type
         let filteredCases = atlasCases;
         
-        // Apply case type filtering based on all filters
         const hasCriminalFilter = filters.some(f => CRIMINAL_FIELDS.includes(f));
         const hasCivilFilter = filters.some(f => CIVIL_FIELDS.includes(f));
         
@@ -857,56 +860,101 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (hasCivilFilter && !hasCriminalFilter) {
             filteredCases = filteredCases.filter(c => c.case_type === 'civil');
         } else if (hasCriminalFilter && hasCivilFilter) {
-            // Both criminal and civil filters - no cases can match both types
             filteredCases = [];
         }
         
-        filteredCases.forEach(caseData => {
-            let value = getFieldValue(caseData, groupByField);
-            
-            // Handle array fields - case appears in multiple groups
-            if (Array.isArray(value) && value.length > 0) {
-                value.forEach(v => {
-                    const groupKey = formatFieldValue(v, groupByField);
-                    if (!groups[groupKey]) {
-                        groups[groupKey] = [];
-                    }
-                    if (!groups[groupKey].includes(caseData)) {
-                        groups[groupKey].push(caseData);
-                    }
-                });
-            } else {
-                const groupKey = formatFieldValue(value, groupByField);
-                if (!groups[groupKey]) {
-                    groups[groupKey] = [];
-                }
-                groups[groupKey].push(caseData);
+        // Filter out cases that don't have valid values for ALL filter fields
+        filteredCases = filteredCases.filter(caseData => {
+            return filters.every(field => hasValidValue(getFieldValue(caseData, field)));
+        });
+        
+        if (filteredCases.length === 0) {
+            atlasContent.innerHTML = '<p class="atlas-placeholder">No cases match the selected grouping criteria.</p>';
+            return;
+        }
+
+        // Build nested group structure
+        function buildGroups(cases, filterIndex) {
+            if (filterIndex >= filters.length) {
+                return cases;
             }
-        });
-
-        const sortedKeys = Object.keys(groups).sort((a, b) => {
-            if (a === 'N/A') return 1;
-            if (b === 'N/A') return -1;
-            return a.localeCompare(b);
-        });
-
-        let html = '';
-        sortedKeys.forEach((groupKey, idx) => {
-            const cases = groups[groupKey];
-            html += `
-                <div class="atlas-group" style="animation-delay: ${idx * 0.05}s">
-                    <div class="atlas-group-header">
-                        <h3 class="atlas-group-title">${escapeHtml(groupKey)}</h3>
-                        <span class="atlas-group-count">${cases.length} case${cases.length !== 1 ? 's' : ''}</span>
+            
+            const field = filters[filterIndex];
+            const groups = {};
+            
+            cases.forEach(caseData => {
+                let value = getFieldValue(caseData, field);
+                
+                if (Array.isArray(value) && value.length > 0) {
+                    value.forEach(v => {
+                        const groupKey = formatFieldValue(v, field);
+                        if (!groups[groupKey]) groups[groupKey] = [];
+                        if (!groups[groupKey].includes(caseData)) {
+                            groups[groupKey].push(caseData);
+                        }
+                    });
+                } else {
+                    const groupKey = formatFieldValue(value, field);
+                    if (!groups[groupKey]) groups[groupKey] = [];
+                    groups[groupKey].push(caseData);
+                }
+            });
+            
+            // Recursively build subgroups
+            const result = {};
+            Object.keys(groups).forEach(key => {
+                result[key] = buildGroups(groups[key], filterIndex + 1);
+            });
+            return result;
+        }
+        
+        const nestedGroups = buildGroups(filteredCases, 0);
+        
+        function sortKeys(keys) {
+            return keys.sort((a, b) => {
+                if (a === 'N/A') return 1;
+                if (b === 'N/A') return -1;
+                return a.localeCompare(b);
+            });
+        }
+        
+        function countCases(group) {
+            if (Array.isArray(group)) return group.length;
+            return Object.values(group).reduce((sum, sub) => sum + countCases(sub), 0);
+        }
+        
+        function renderGroup(group, level, parentIdx) {
+            if (Array.isArray(group)) {
+                return `<div class="atlas-grid">${group.map(c => renderAtlasCard(c)).join('')}</div>`;
+            }
+            
+            const sortedKeys = sortKeys(Object.keys(group));
+            let html = '';
+            
+            sortedKeys.forEach((key, idx) => {
+                const subgroup = group[key];
+                const caseCount = countCases(subgroup);
+                const animDelay = (parentIdx * 0.02) + (idx * 0.03);
+                const levelClass = level === 0 ? 'atlas-group' : 'atlas-subgroup';
+                const titleTag = level === 0 ? 'h3' : 'h4';
+                
+                html += `
+                    <div class="${levelClass}" style="animation-delay: ${animDelay}s" data-level="${level}">
+                        <div class="atlas-group-header">
+                            <${titleTag} class="atlas-group-title">${escapeHtml(key)}</${titleTag}>
+                            <span class="atlas-group-count">${caseCount} case${caseCount !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="atlas-group-content">
+                            ${renderGroup(subgroup, level + 1, idx)}
+                        </div>
                     </div>
-                    <div class="atlas-grid">
-                        ${cases.map(c => renderAtlasCard(c)).join('')}
-                    </div>
-                </div>
-            `;
-        });
-
-        atlasContent.innerHTML = html;
+                `;
+            });
+            
+            return html;
+        }
+        
+        atlasContent.innerHTML = renderGroup(nestedGroups, 0, 0);
 
         // Add click handlers to cards
         atlasContent.querySelectorAll('.atlas-card').forEach(card => {
