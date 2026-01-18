@@ -116,6 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const atlasContent = document.getElementById('atlas-content');
     let atlasCases = [];
     let atlasFilterCount = 0;
+    
+    const CRIMINAL_FIELDS = ['offense_severity', 'charges', 'weapon_type', 'victim_count', 'evidence_types', 'aggravating_factors', 'prior_record_severity'];
+    const CIVIL_FIELDS = ['cause_of_action', 'duty_of_care_source', 'breach_description', 'proximate_causation_score', 'damages_claimed', 'is_settlement'];
 
     const FILTER_OPTIONS_HTML = `
         <optgroup label="General">
@@ -164,12 +167,66 @@ document.addEventListener('DOMContentLoaded', () => {
         return wrapper;
     }
 
+    function updateFilterDropdowns() {
+        const allSelects = atlasFiltersContainer.querySelectorAll('.atlas-filter-select');
+        const selectedValues = Array.from(allSelects).map(s => s.value);
+        
+        // Determine if a case-type-specific filter is selected
+        const hasCriminalFilter = selectedValues.some(v => CRIMINAL_FIELDS.includes(v));
+        const hasCivilFilter = selectedValues.some(v => CIVIL_FIELDS.includes(v));
+        
+        allSelects.forEach((select, idx) => {
+            const currentValue = select.value;
+            const otherSelectedValues = selectedValues.filter((_, i) => i !== idx);
+            
+            select.querySelectorAll('option').forEach(option => {
+                const val = option.value;
+                // Hide if already selected by another filter
+                let shouldHide = otherSelectedValues.includes(val);
+                
+                // Hide opposite case type options (but not from the dropdown that has the current value)
+                if (!shouldHide && hasCriminalFilter && CIVIL_FIELDS.includes(val)) {
+                    shouldHide = true;
+                }
+                if (!shouldHide && hasCivilFilter && CRIMINAL_FIELDS.includes(val)) {
+                    shouldHide = true;
+                }
+                
+                if (shouldHide) {
+                    option.disabled = true;
+                    option.style.display = 'none';
+                } else {
+                    option.disabled = false;
+                    option.style.display = '';
+                }
+            });
+        });
+    }
+
     function addAtlasFilter() {
         atlasFilterCount++;
         const isFirst = atlasFiltersContainer.children.length === 0;
         const filterEl = createFilterElement(atlasFilterCount, !isFirst);
         atlasFiltersContainer.appendChild(filterEl);
         
+        // Select first available (non-disabled) option for new filter
+        if (!isFirst) {
+            const newSelect = filterEl.querySelector('.atlas-filter-select');
+            const selectedValues = getActiveFilters().slice(0, -1);
+            const hasCriminalFilter = selectedValues.some(v => CRIMINAL_FIELDS.includes(v));
+            const hasCivilFilter = selectedValues.some(v => CIVIL_FIELDS.includes(v));
+            
+            for (const option of newSelect.options) {
+                const val = option.value;
+                if (selectedValues.includes(val)) continue;
+                if (hasCriminalFilter && CIVIL_FIELDS.includes(val)) continue;
+                if (hasCivilFilter && CRIMINAL_FIELDS.includes(val)) continue;
+                newSelect.value = val;
+                break;
+            }
+        }
+        
+        updateFilterDropdowns();
         onAtlasFilterChange();
     }
 
@@ -178,6 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filterEl) {
             filterEl.remove();
         }
+        updateFilterDropdowns();
         onAtlasFilterChange();
     }
 
@@ -190,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function onAtlasFilterChange() {
+        updateFilterDropdowns();
         if (atlasCases.length) {
             atlasContent.innerHTML = '';
             setTimeout(() => renderAtlasGrid(getActiveFilters()), 50);
@@ -781,9 +840,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return String(value);
     }
-
-    const CRIMINAL_FIELDS = ['offense_severity', 'charges', 'weapon_type', 'victim_count', 'evidence_types', 'aggravating_factors', 'prior_record_severity'];
-    const CIVIL_FIELDS = ['cause_of_action', 'duty_of_care_source', 'breach_description', 'proximate_causation_score', 'damages_claimed', 'is_settlement'];
 
     function renderAtlasGrid(filters) {
         const groups = {};
