@@ -32,6 +32,7 @@ ATOMIZE_PROMPT_TEMPLATE = """
 You are given the facts, legal issues, reasonings, and outcomes from a case.
 Classify the case as criminal or civil, then return JSON that matches the schema.
 Set only the matching object (criminal or civil) and set the other to null.
+Include the legal issues from the input in the output.
 
 Facts, issues, reasonings, and outcomes:
 {stage1_json}

@@ -75,7 +75,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const caseType = data.case_type ? data.case_type.toUpperCase() : 'UNKNOWN';
         const sections = [];
 
-        const addSection = (title, obj) => {
+        // Add legal issues section
+        if (data.issues && data.issues.length) {
+            const issuesList = data.issues
+                .map(issue => `<li>${escapeHtml(issue)}</li>`)
+                .join('');
+            sections.push(
+                `<div class="stage2-section"><div class="stage2-section-title">Legal Issues</div><ul class="stage2-issues">${issuesList}</ul></div>`
+            );
+        }
+
+        const addDetails = (obj) => {
             if (!obj) {
                 return;
             }
@@ -83,15 +93,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 return `<div class="stage2-row"><dt>${escapeHtml(label)}</dt><dd>${formatStage2Value(value)}</dd></div>`;
             });
-            sections.push(
-                `<div class="stage2-section"><div class="stage2-section-title">${escapeHtml(title)}</div><dl class="stage2-list">${rows.join('')}</dl></div>`
-            );
+            sections.push(`<dl class="stage2-list">${rows.join('')}</dl>`);
         };
 
-        addSection('Criminal', data.criminal);
-        addSection('Civil', data.civil);
+        addDetails(data.criminal);
+        addDetails(data.civil);
 
-        return `<div class="stage2-output"><div class="stage2-header"><span class="stage2-label">Case Type</span><span class="stage2-badge">${escapeHtml(caseType)}</span></div>${sections.join('')}</div>`;
+        return `<div class="stage2-card"><div class="stage2-header"><span class="stage2-label">Case Type</span><span class="stage2-badge">${escapeHtml(caseType)}</span></div>${sections.join('')}</div>`;
     }
 
     function setActiveTab(stage) {
@@ -121,6 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const CIVIL_FIELDS = ['cause_of_action', 'duty_of_care_source', 'breach_description', 'proximate_causation_score', 'damages_claimed', 'is_settlement'];
 
     const FILTER_OPTIONS_HTML = `
+        <option value="">Select grouping...</option>
         <optgroup label="General">
             <option value="case_type">Case Type</option>
         </optgroup>
@@ -169,18 +178,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateFilterDropdowns() {
         const allSelects = atlasFiltersContainer.querySelectorAll('.atlas-filter-select');
-        const selectedValues = Array.from(allSelects).map(s => s.value);
+        const selectedValues = Array.from(allSelects).map(s => s.value).filter(v => v !== '');
         
-        // Determine if a case-type-specific filter is selected
+        // Determine if a case-type-specific filter is selected (exclude empty values)
         const hasCriminalFilter = selectedValues.some(v => CRIMINAL_FIELDS.includes(v));
         const hasCivilFilter = selectedValues.some(v => CIVIL_FIELDS.includes(v));
         
         allSelects.forEach((select, idx) => {
             const currentValue = select.value;
-            const otherSelectedValues = selectedValues.filter((_, i) => i !== idx);
+            const otherSelectedValues = selectedValues.filter(v => v !== currentValue);
             
             select.querySelectorAll('option').forEach(option => {
                 const val = option.value;
+                // Never hide the placeholder option
+                if (val === '') {
+                    option.disabled = false;
+                    option.style.display = '';
+                    return;
+                }
+                
                 // Hide if already selected by another filter
                 let shouldHide = otherSelectedValues.includes(val);
                 
@@ -209,25 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const filterEl = createFilterElement(atlasFilterCount, !isFirst);
         atlasFiltersContainer.appendChild(filterEl);
         
-        // Select first available (non-disabled) option for new filter
-        if (!isFirst) {
-            const newSelect = filterEl.querySelector('.atlas-filter-select');
-            const selectedValues = getActiveFilters().slice(0, -1);
-            const hasCriminalFilter = selectedValues.some(v => CRIMINAL_FIELDS.includes(v));
-            const hasCivilFilter = selectedValues.some(v => CIVIL_FIELDS.includes(v));
-            
-            for (const option of newSelect.options) {
-                const val = option.value;
-                if (selectedValues.includes(val)) continue;
-                if (hasCriminalFilter && CIVIL_FIELDS.includes(val)) continue;
-                if (hasCivilFilter && CRIMINAL_FIELDS.includes(val)) continue;
-                newSelect.value = val;
-                break;
-            }
-        }
-        
         updateFilterDropdowns();
-        onAtlasFilterChange();
     }
 
     function removeAtlasFilter(filterId) {
@@ -249,9 +247,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function onAtlasFilterChange() {
         updateFilterDropdowns();
-        if (atlasCases.length) {
+        const filters = getActiveFilters();
+        const allFiltersValid = filters.length > 0 && filters.every(f => f !== '');
+        if (atlasCases.length && allFiltersValid) {
             atlasContent.innerHTML = '';
-            setTimeout(() => renderAtlasGrid(getActiveFilters()), 50);
+            setTimeout(() => renderAtlasGrid(filters), 50);
         }
     }
 

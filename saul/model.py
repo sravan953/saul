@@ -48,6 +48,7 @@ class CivilAtomizedCase(BaseModel):
 
 class AtomizedCaseOutput(BaseModel):
     case_type: Literal["criminal", "civil"]
+    issues: List[str] = Field(description="List of legal issues identified from the case.")
     criminal: Optional[CriminalAtomizedCase] = None
     civil: Optional[CivilAtomizedCase] = None
 

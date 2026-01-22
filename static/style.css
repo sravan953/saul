@@ -411,27 +411,21 @@ h2 {
     line-height: 1.5;
 }
 
-.stage2-output {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+.stage2-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .stage2-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #ffffff;
-    border: 1px solid var(--border-color);
-    border-radius: 12px 12px 0 0;
-    padding: 10px 14px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
     border-bottom: 1px solid var(--border-color);
-    margin-top: 16px;
-}
-
-.stage2-output > .stage2-header:first-child {
-    margin-top: 0;
 }
 
 .stage2-label {
@@ -451,30 +445,24 @@ h2 {
 }
 
 .stage2-section {
-    background: #ffffff;
-    border: 1px solid var(--border-color);
-    border-radius: 0 0 12px 12px;
-    padding: 12px 14px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    border-top: none;
     margin-bottom: 16px;
 }
 
-.stage2-output > .stage2-section:last-child {
+.stage2-section:last-child {
     margin-bottom: 0;
 }
 
 .stage2-section-title {
     font-weight: 700;
     color: var(--accent-color);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .stage2-list {
     margin: 0;
     display: grid;
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 10px;
 }
 
 .stage2-row {
@@ -507,6 +495,34 @@ h2 {
 
 .stage2-muted {
     color: #94a3b8;
+}
+
+.stage2-issues {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.stage2-issues li {
+    position: relative;
+    padding-left: 14px;
+    margin-bottom: 10px;
+    color: #2d3748;
+}
+
+.stage2-issues li:last-child {
+    margin-bottom: 0;
+}
+
+.stage2-issues li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 6px;
+    height: 6px;
+    background: var(--button-bg);
+    border-radius: 50%;
 }
 
 .stage2-error {
