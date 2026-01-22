@@ -23,17 +23,17 @@ OLLAMA_MODEL = "gemma3:12b"
 OPENAI_MODEL = "gpt-4o-mini"
 
 PROMPT_TEMPLATE = """
-Extract facts, reasonings, and conclusions from this case:
+Extract facts, identify legal issues, analyze reasonings, and determine conclusions from this case:
 
 {text}
 """
 
 ATOMIZE_PROMPT_TEMPLATE = """
-You are given the facts, reasonings, and outcomes from a case.
+You are given the facts, legal issues, reasonings, and outcomes from a case.
 Classify the case as criminal or civil, then return JSON that matches the schema.
 Set only the matching object (criminal or civil) and set the other to null.
 
-Facts, reasonings, and outcomes:
+Facts, issues, reasonings, and outcomes:
 {stage1_json}
 """
 
@@ -53,6 +53,11 @@ def format_analysis_html(analysis: Analysis) -> str:
     html += "<h3>Facts</h3><ul>"
     for fact in analysis.facts:
         html += f"<li>{fact}</li>"
+    html += "</ul>"
+
+    html += "<h3>Legal Issues</h3><ul>"
+    for issue in analysis.issues:
+        html += f"<li>{issue}</li>"
     html += "</ul>"
 
     html += "<h3>Reasonings</h3><ul>"

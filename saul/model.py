@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class Analysis(BaseModel):
     facts: list[str] = Field(description="List of facts from the case.")
+    issues: list[str] = Field(description="List of legal issues identified from the case.")
     reasonings: list[str] = Field(description="List of reasonings from the case.")
     outcomes: str = Field(description="Outcome of the case.")
 
