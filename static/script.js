@@ -1068,7 +1068,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="atlas-card" data-filename="${escapeHtml(filename)}">
                 <div class="atlas-card-header">
                     <span class="atlas-card-filename">${escapeHtml(filename.replace('.json', ''))}</span>
-                    <span class="atlas-card-badge">${escapeHtml(caseType)}</span>
                     <button class="atlas-card-close" title="Close">&times;</button>
                 </div>
                 <div class="atlas-card-preview">${previewHtml}</div>

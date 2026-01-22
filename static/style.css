@@ -1016,3 +1016,9 @@ h2 {
 .atlas-card-close:hover {
     color: var(--accent-color);
 }
+
+.atlas-card-detail .stage2-card {
+    border: none;
+    padding: 0;
+    box-shadow: none;
+}
