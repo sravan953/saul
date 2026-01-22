@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileList = document.getElementById('file-list');
     const caseFrame = document.getElementById('case-frame');
     const runBtn = document.getElementById('run-btn');
-    const runStage2Btn = document.getElementById('run-stage2-btn');
+    const repeatBtn = document.getElementById('repeat-btn');
     const tabStage1 = document.getElementById('tab-stage1');
     const tabStage2 = document.getElementById('tab-stage2');
     const stage1Output = document.getElementById('stage1-output');
@@ -29,11 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedFile = null;
     let abortController = null;
     let batchAbortController = null;
-    let stage2AbortController = null;
     let batchStage2AbortController = null;
     let statusAbortController = null;
+    
+    // Track stage completion for the selected file
+    let stage1Complete = false;
+    let stage2Complete = false;
+    let currentStage = 1; // Which stage the run button will execute
 
-    runStage2Btn.hidden = true;
+    repeatBtn.hidden = true;
     tabStage1.disabled = true;
     tabStage2.disabled = true;
 
@@ -108,6 +112,36 @@ document.addEventListener('DOMContentLoaded', () => {
         tabStage2.classList.toggle('active', isStage2);
         stage1Output.classList.toggle('active', !isStage2);
         stage2Output.classList.toggle('active', isStage2);
+        updateRepeatButtonVisibility();
+    }
+
+    function updateRepeatButtonVisibility() {
+        const isStage2Active = tabStage2.classList.contains('active');
+        if (isStage2Active && stage2Complete) {
+            repeatBtn.hidden = false;
+            repeatBtn.textContent = 'Repeat stage 2';
+        } else if (!isStage2Active && stage1Complete) {
+            repeatBtn.hidden = false;
+            repeatBtn.textContent = 'Repeat stage 1';
+        } else {
+            repeatBtn.hidden = true;
+        }
+    }
+
+    function updateRunButton() {
+        if (!stage1Complete) {
+            currentStage = 1;
+            runBtn.textContent = 'Run stage 1';
+            runBtn.disabled = false;
+            runBtn.hidden = false;
+        } else if (!stage2Complete) {
+            currentStage = 2;
+            runBtn.textContent = 'Run stage 2';
+            runBtn.disabled = false;
+            runBtn.hidden = false;
+        } else {
+            runBtn.hidden = true;
+        }
     }
 
     tabStage1.addEventListener('click', () => setActiveTab('stage1'));
@@ -309,11 +343,12 @@ document.addEventListener('DOMContentLoaded', () => {
         element.classList.add('selected');
         
         selectedFile = filename;
+        stage1Complete = false;
+        stage2Complete = false;
         runBtn.disabled = true;
-        runBtn.textContent = 'Run stage 1 case extraction';
-        runStage2Btn.disabled = true;
-        runStage2Btn.hidden = true;
-        runStage2Btn.textContent = 'Run stage 2 case extraction';
+        runBtn.hidden = false;
+        runBtn.textContent = 'Run stage 1';
+        repeatBtn.hidden = true;
         tabStage1.disabled = true;
         tabStage2.disabled = true;
         setActiveTab('stage1');
@@ -327,11 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (abortController) {
             abortController.abort();
             abortController = null;
-            runBtn.textContent = 'Run stage 1 case extraction';
-        }
-        if (stage2AbortController) {
-            stage2AbortController.abort();
-            stage2AbortController = null;
+            runBtn.textContent = 'Run stage 1';
         }
         if (statusAbortController) {
             statusAbortController.abort();
@@ -360,22 +391,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (signal.aborted || selectedFile !== currentFile) {
                     return null;
                 }
-                const hasStage1 = stage1Status.exists === true;
-                const hasStage2 = stage2Status.exists === true;
+                stage1Complete = stage1Status.exists === true;
+                stage2Complete = stage2Status.exists === true;
 
-                tabStage1.disabled = !hasStage1;
-                tabStage2.disabled = !hasStage2;
+                tabStage1.disabled = !stage1Complete;
+                tabStage2.disabled = !stage2Complete;
 
-                if (hasStage1) {
-                    runBtn.disabled = true;
-                    runStage2Btn.hidden = false;
-                    runStage2Btn.disabled = hasStage2;
-                } else {
-                    runBtn.disabled = false;
-                    runBtn.textContent = 'Run stage 1 case extraction';
-                }
+                updateRunButton();
+                updateRepeatButtonVisibility();
 
-                const stage1Fetch = hasStage1
+                const stage1Fetch = stage1Complete
                     ? fetch(`/api/output/${filename}`, { signal }).then(response => {
                           if (response.ok) {
                               return response.text();
@@ -384,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
                       })
                     : Promise.resolve(null);
 
-                const stage2Fetch = hasStage2
+                const stage2Fetch = stage2Complete
                     ? fetch(`/api/output_stage2/${filename}`, { signal }).then(response => {
                           if (response.ok) {
                               return response.json();
@@ -397,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (signal.aborted || selectedFile !== currentFile) {
                         return null;
                     }
-                    return { html, stage2, hasStage1, hasStage2 };
+                    return { html, stage2 };
                 });
             })
             .then(result => {
@@ -405,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const { html, stage2, hasStage1, hasStage2 } = result;
+                const { html, stage2 } = result;
                 if (html) {
                     stage1Output.innerHTML = html;
                 }
@@ -413,9 +438,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     stage2Output.innerHTML = formatStage2Output(stage2);
                 }
 
-                if (hasStage2) {
+                if (stage2Complete) {
                     setActiveTab('stage2');
-                } else if (hasStage1) {
+                } else if (stage1Complete) {
                     setActiveTab('stage1');
                 }
 
@@ -427,8 +452,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 console.log('Cache check failed:', err);
-                runBtn.disabled = false;
-                runBtn.textContent = 'Run stage 1 case extraction';
+                stage1Complete = false;
+                stage2Complete = false;
+                updateRunButton();
+                updateRepeatButtonVisibility();
             });
     }
 
@@ -438,12 +465,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (abortController) {
             abortController.abort();
             abortController = null;
-            runBtn.textContent = 'Run stage 1 case extraction';
+            updateRunButton();
             return;
         }
 
+        if (currentStage === 1) {
+            await runStage1();
+        } else {
+            await runStage2();
+        }
+    };
+
+    async function runStage1() {
         stage1Output.innerHTML = '<p>Thinking...</p>';
         runBtn.textContent = 'Stop';
+        repeatBtn.hidden = true;
         abortController = new AbortController();
 
         let analysisSucceeded = false;
@@ -481,39 +517,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } finally {
             if (analysisSucceeded) {
-                runBtn.disabled = true;
-                runBtn.textContent = 'Run stage 1 case extraction';
-                runStage2Btn.hidden = false;
-                runStage2Btn.disabled = false;
+                stage1Complete = true;
                 tabStage1.disabled = false;
                 setActiveTab('stage1');
-            } else {
-                runBtn.textContent = 'Run stage 1 case extraction';
-                runStage2Btn.hidden = true;
-                runStage2Btn.disabled = true;
             }
+            updateRunButton();
+            updateRepeatButtonVisibility();
             abortController = null;
         }
-    };
+    }
 
-    runStage2Btn.onclick = async () => {
-        if (!selectedFile) return;
-
-        if (stage2AbortController) {
-            stage2AbortController.abort();
-            stage2AbortController = null;
-            runStage2Btn.textContent = 'Run stage 2 case extraction';
-            return;
-        }
-
+    async function runStage2() {
         stage2Output.innerHTML = '<p class="stage2-muted">Thinking...</p>';
-        runStage2Btn.textContent = 'Stop';
-        stage2AbortController = new AbortController();
+        runBtn.textContent = 'Stop';
+        repeatBtn.hidden = true;
+        abortController = new AbortController();
 
         try {
             const response = await fetch(`/api/analyze_stage2/${selectedFile}`, {
                 method: 'POST',
-                signal: stage2AbortController.signal
+                signal: abortController.signal
             });
 
             if (!response.ok) {
@@ -525,9 +548,9 @@ document.addEventListener('DOMContentLoaded', () => {
             stage2Output.innerHTML = formatStage2Output(data);
             const outputContainer = document.getElementById('analysis-output');
             outputContainer.scrollTop = outputContainer.scrollHeight;
+            stage2Complete = true;
             tabStage2.disabled = false;
             setActiveTab('stage2');
-            runStage2Btn.disabled = true;
         } catch (err) {
             if (err.name === 'AbortError') {
                 stage2Output.innerHTML += '<p class="stage2-muted">[Stage 2 stopped]</p>';
@@ -535,8 +558,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 stage2Output.innerHTML = `<p class="stage2-error">Error: ${escapeHtml(err.message)}</p>`;
             }
         } finally {
-            runStage2Btn.textContent = 'Run stage 2 case extraction';
-            stage2AbortController = null;
+            updateRunButton();
+            updateRepeatButtonVisibility();
+            abortController = null;
+        }
+    }
+
+    repeatBtn.onclick = async () => {
+        if (!selectedFile) return;
+
+        const isStage2Active = tabStage2.classList.contains('active');
+        
+        if (isStage2Active) {
+            // Repeat stage 2
+            stage2Complete = false;
+            updateRunButton();
+            updateRepeatButtonVisibility();
+            await runStage2();
+        } else {
+            // Repeat stage 1 - need to delete stage 2 output if it exists
+            if (stage2Complete) {
+                try {
+                    await fetch(`/api/output_stage2/${selectedFile}`, { method: 'DELETE' });
+                } catch (err) {
+                    console.error('Failed to delete stage 2 output:', err);
+                }
+                stage2Complete = false;
+                stage2Output.innerHTML = '';
+                tabStage2.disabled = true;
+            }
+            stage1Complete = false;
+            updateRunButton();
+            updateRepeatButtonVisibility();
+            await runStage1();
         }
     };
 

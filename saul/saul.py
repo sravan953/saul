@@ -106,6 +106,15 @@ async def output_stage2_exists(filename: str):
     return {"exists": output_file.exists()}
 
 
+@app.delete("/api/output_stage2/{filename}")
+async def delete_stage2_output(filename: str):
+    output_file = _stage2_output_path(filename)
+    if output_file.exists():
+        output_file.unlink()
+        return {"deleted": True}
+    return {"deleted": False}
+
+
 @app.post("/api/analyze/{filename}")
 async def analyze_case(filename: str):
     json_file = JSON_DIR / filename

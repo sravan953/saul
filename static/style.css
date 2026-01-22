@@ -267,6 +267,14 @@ h2 {
     justify-content: flex-end;
 }
 
+.repeat-btn {
+    background-color: var(--accent-color);
+}
+
+.repeat-btn:hover:not(:disabled) {
+    background-color: var(--hover-color);
+}
+
 .analysis-output {
     flex: 1;
     overflow-y: auto;
