@@ -289,8 +289,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Initialize first filter and add button handler
+    // Initialize first filter with case_type as default, and add button handler
     addAtlasFilter();
+    const firstFilterSelect = atlasFiltersContainer.querySelector('.atlas-filter-select');
+    if (firstFilterSelect) {
+        firstFilterSelect.value = 'case_type';
+        const placeholderOption = firstFilterSelect.querySelector('option[value=""]');
+        if (placeholderOption) {
+            placeholderOption.remove();
+        }
+    }
     atlasAddFilterBtn.addEventListener('click', addAtlasFilter);
 
     // View switching
