@@ -419,6 +419,7 @@ h2 {
     line-height: 1.5;
 }
 
+.stage1-card,
 .stage2-card {
     background: #ffffff;
     border: 1px solid var(--border-color);
@@ -427,6 +428,7 @@ h2 {
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
+.stage1-header,
 .stage2-header {
     display: flex;
     align-items: center;
@@ -436,11 +438,13 @@ h2 {
     border-bottom: 1px solid var(--border-color);
 }
 
+.stage1-label,
 .stage2-label {
     font-weight: 600;
     color: var(--accent-color);
 }
 
+.stage1-badge,
 .stage2-badge {
     background: rgba(44, 62, 80, 0.1);
     color: var(--accent-color);
@@ -452,14 +456,17 @@ h2 {
     letter-spacing: 0.04em;
 }
 
+.stage1-section,
 .stage2-section {
-    margin-bottom: 16px;
+    margin-bottom: 24px;
 }
 
+.stage1-section:last-child,
 .stage2-section:last-child {
     margin-bottom: 0;
 }
 
+.stage1-section-title,
 .stage2-section-title {
     font-weight: 700;
     color: var(--accent-color);
@@ -505,12 +512,14 @@ h2 {
     color: #94a3b8;
 }
 
+.stage1-list,
 .stage2-issues {
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
+.stage1-list li,
 .stage2-issues li {
     position: relative;
     padding-left: 14px;
@@ -518,10 +527,12 @@ h2 {
     color: #2d3748;
 }
 
+.stage1-list li:last-child,
 .stage2-issues li:last-child {
     margin-bottom: 0;
 }
 
+.stage1-list li::before,
 .stage2-issues li::before {
     content: '';
     position: absolute;
@@ -533,8 +544,26 @@ h2 {
     border-radius: 50%;
 }
 
+.stage1-outcome {
+    margin: 0;
+    color: #2d3748;
+    line-height: 1.5;
+}
+
 .stage2-error {
     color: #e74c3c;
+}
+
+.stage2-outcome {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stage2-outcome-details {
+    margin: 0;
+    color: #2d3748;
+    line-height: 1.5;
 }
 
 /* Case Extraction View */

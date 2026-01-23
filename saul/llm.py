@@ -1,4 +1,5 @@
 import asyncio
+import html
 import json
 import os
 from pathlib import Path
@@ -33,6 +34,8 @@ You are given the facts, legal issues, reasonings, and outcomes from a case.
 Classify the case as criminal or civil, then return JSON that matches the schema.
 Set only the matching object (criminal or civil) and set the other to null.
 Include the legal issues from the input in the output.
+For outcome_category, select the most appropriate category for filtering similar cases.
+For outcome_details, include specifics like sentence length, damages awarded, or other relevant outcome information.
 
 Facts, issues, reasonings, and outcomes:
 {stage1_json}
@@ -48,28 +51,36 @@ def build_full_opinion(data: dict) -> str:
     return "".join(opinion.get("text", "") for opinion in opinions)
 
 
-def format_analysis_html(analysis: Analysis) -> str:
-    html = "<div class='analysis'>"
-
-    html += "<h3>Facts</h3><ul>"
+def format_analysis_html(analysis: Analysis, case_type: str | None = None) -> str:
+    html_output = "<div class='stage1-card'>"
+    
+    # Header with case type badge
+    case_type_display = case_type.upper() if case_type else "Not Classified"
+    html_output += f"<div class='stage1-header'><span class='stage1-label'>Case Type</span><span class='stage1-badge'>{html.escape(case_type_display)}</span></div>"
+    
+    # Facts section
+    html_output += "<div class='stage1-section'><div class='stage1-section-title'>Facts</div><ul class='stage1-list'>"
     for fact in analysis.facts:
-        html += f"<li>{fact}</li>"
-    html += "</ul>"
-
-    html += "<h3>Legal Issues</h3><ul>"
+        html_output += f"<li>{html.escape(fact)}</li>"
+    html_output += "</ul></div>"
+    
+    # Legal Issues section
+    html_output += "<div class='stage1-section'><div class='stage1-section-title'>Legal Issues</div><ul class='stage1-list'>"
     for issue in analysis.issues:
-        html += f"<li>{issue}</li>"
-    html += "</ul>"
-
-    html += "<h3>Reasonings</h3><ul>"
+        html_output += f"<li>{html.escape(issue)}</li>"
+    html_output += "</ul></div>"
+    
+    # Reasonings section
+    html_output += "<div class='stage1-section'><div class='stage1-section-title'>Reasonings</div><ul class='stage1-list'>"
     for reasoning in analysis.reasonings:
-        html += f"<li>{reasoning}</li>"
-    html += "</ul>"
-
-    html += f"<h3>Outcome</h3><p>{analysis.outcomes}</p>"
-
-    html += "</div>"
-    return html
+        html_output += f"<li>{html.escape(reasoning)}</li>"
+    html_output += "</ul></div>"
+    
+    # Outcome section
+    html_output += f"<div class='stage1-section'><div class='stage1-section-title'>Outcome</div><p class='stage1-outcome'>{html.escape(analysis.outcomes)}</p></div>"
+    
+    html_output += "</div>"
+    return html_output
 
 
 async def _check_ollama() -> None:
