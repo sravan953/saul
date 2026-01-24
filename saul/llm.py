@@ -24,20 +24,20 @@ OLLAMA_MODEL = "gemma3:12b"
 OPENAI_MODEL = "gpt-4o-mini"
 
 PROMPT_TEMPLATE = """
-Extract facts, identify legal issues, analyze reasonings, and determine conclusions from this case:
+Extract facts, identify legal issues, analyze reasonings, determine conclusions, and classify the case type (criminal or civil) from this case:
 
 {text}
 """
 
 ATOMIZE_PROMPT_TEMPLATE = """
-You are given the facts, legal issues, reasonings, and outcomes from a case.
-Classify the case as criminal or civil, then return JSON that matches the schema.
+You are given the facts, legal issues, reasonings, outcomes, and case type from a case.
+Return JSON that matches the schema using the case type provided.
 Set only the matching object (criminal or civil) and set the other to null.
 Include the legal issues from the input in the output.
 For outcome_category, select the most appropriate category for filtering similar cases.
 For outcome_details, include specifics like sentence length, damages awarded, or other relevant outcome information.
 
-Facts, issues, reasonings, and outcomes:
+Facts, issues, reasonings, outcomes, and case type:
 {stage1_json}
 """
 
@@ -51,11 +51,11 @@ def build_full_opinion(data: dict) -> str:
     return "".join(opinion.get("text", "") for opinion in opinions)
 
 
-def format_analysis_html(analysis: Analysis, case_type: str | None = None) -> str:
+def format_analysis_html(analysis: Analysis) -> str:
     html_output = "<div class='stage1-card'>"
     
     # Header with case type badge
-    case_type_display = case_type.upper() if case_type else "Not Classified"
+    case_type_display = analysis.case_type.upper()
     html_output += f"<div class='stage1-header'><span class='stage1-label'>Case Type</span><span class='stage1-badge'>{html.escape(case_type_display)}</span></div>"
     
     # Facts section
@@ -222,8 +222,8 @@ def _call_openai_atomize(prompt: str) -> AtomizedCaseOutput:
             {
                 "role": "system",
                 "content": (
-                    "Classify the case as criminal or civil and respond with JSON "
-                    "matching the provided schema."
+                    "Respond with JSON matching the provided schema. Use the case type "
+                    "provided in the input."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -283,6 +283,9 @@ async def atomize_analysis(
     else:
         await _check_ollama()
         atomized = await _call_ollama_atomize(prompt)
+
+    # Copy case_type from stage 1 instead of using extracted value
+    atomized.case_type = analysis.case_type
 
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)

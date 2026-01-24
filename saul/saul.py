@@ -76,19 +76,9 @@ async def get_cached_output(filename: str):
             data = json.load(f)
         analysis = Analysis.model_validate(data)
 
-        # Check if stage 2 output exists to get case type
-        case_type = None
-        stage2_file = _stage2_output_path(filename)
-        if stage2_file.exists():
-            try:
-                stage2_data = json.loads(stage2_file.read_text(encoding="utf-8"))
-                case_type = stage2_data.get("case_type")
-            except Exception:
-                pass
-
         from fastapi.responses import HTMLResponse
 
-        return HTMLResponse(content=format_analysis_html(analysis, case_type))
+        return HTMLResponse(content=format_analysis_html(analysis))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -160,18 +150,7 @@ async def analyze_case(filename: str):
                     data = json.load(f)
                 analysis = Analysis.model_validate(data)
 
-                # Check if stage 2 output exists to get case type
-                case_type = None
-                if OUTPUT_STAGE2_DIR.exists():
-                    stage2_file = _stage2_output_path(filename)
-                    if stage2_file.exists():
-                        try:
-                            stage2_data = json.loads(stage2_file.read_text(encoding="utf-8"))
-                            case_type = stage2_data.get("case_type")
-                        except Exception:
-                            pass
-
-                return format_analysis_html(analysis, case_type)
+                return format_analysis_html(analysis)
             except Exception as e:
                 # If cache is invalid, ignore and re-analyze
                 print(f"Error reading cache: {e}")
