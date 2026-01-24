@@ -97,6 +97,15 @@ async def output_exists(filename: str):
     return {"exists": output_file.exists()}
 
 
+@app.delete("/api/output/{filename}")
+async def delete_stage1_output(filename: str):
+    output_file = OUTPUT_STAGE1_DIR / filename
+    if output_file.exists():
+        output_file.unlink()
+        return {"deleted": True}
+    return {"deleted": False}
+
+
 def _stage2_output_path(filename: str) -> Path:
     return OUTPUT_STAGE2_DIR / f"{Path(filename).stem}.atomized.json"
 

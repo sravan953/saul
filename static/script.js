@@ -578,13 +578,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const isStage2Active = tabStage2.classList.contains('active');
         
         if (isStage2Active) {
-            // Repeat stage 2
+            // Repeat stage 2 - need to delete existing stage 2 output first
+            if (stage2Complete) {
+                try {
+                    await fetch(`/api/output_stage2/${selectedFile}`, { method: 'DELETE' });
+                } catch (err) {
+                    console.error('Failed to delete stage 2 output:', err);
+                }
+            }
             stage2Complete = false;
+            stage2Output.innerHTML = '';
             updateRunButton();
             updateRepeatButtonVisibility();
             await runStage2();
         } else {
-            // Repeat stage 1 - need to delete stage 2 output if it exists
+            // Repeat stage 1 - need to delete stage 1 and stage 2 outputs if they exist
+            if (stage1Complete) {
+                try {
+                    await fetch(`/api/output/${selectedFile}`, { method: 'DELETE' });
+                } catch (err) {
+                    console.error('Failed to delete stage 1 output:', err);
+                }
+            }
             if (stage2Complete) {
                 try {
                     await fetch(`/api/output_stage2/${selectedFile}`, { method: 'DELETE' });
@@ -596,6 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tabStage2.disabled = true;
             }
             stage1Complete = false;
+            stage1Output.innerHTML = '';
             updateRunButton();
             updateRepeatButtonVisibility();
             await runStage1();
