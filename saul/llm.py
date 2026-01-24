@@ -109,6 +109,7 @@ async def call_ollama(
         full_response += chunk["message"]["content"]
     analysis = Analysis.model_validate_json(full_response)
     if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(analysis.model_dump_json(indent=2), encoding="utf-8")
     yield format_analysis_html(analysis)
 
@@ -152,6 +153,7 @@ def _call_openrouter(prompt: str, save_path: Path | None = None) -> str:
     content = data["choices"][0]["message"]["content"]
     analysis = Analysis.model_validate_json(content)
     if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(analysis.model_dump_json(indent=2), encoding="utf-8")
     return format_analysis_html(analysis)
 
@@ -205,6 +207,7 @@ def _call_openai(prompt: str, save_path: Path | None = None) -> str:
         text_format=Analysis,
     )
     if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(
             response.output_parsed.model_dump_json(indent=2), encoding="utf-8"
         )
@@ -282,5 +285,6 @@ async def atomize_analysis(
         atomized = await _call_ollama_atomize(prompt)
 
     if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(atomized.model_dump_json(indent=2), encoding="utf-8")
     return atomized

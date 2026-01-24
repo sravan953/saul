@@ -65,6 +65,8 @@ async def get_html(filename: str):
 
 @app.get("/api/output/{filename}")
 async def get_cached_output(filename: str):
+    if not OUTPUT_STAGE1_DIR.exists():
+        raise HTTPException(status_code=404, detail="Output directory not found")
     output_file = OUTPUT_STAGE1_DIR / filename
     if not output_file.exists():
         raise HTTPException(status_code=404, detail="Cached output not found")
@@ -93,12 +95,16 @@ async def get_cached_output(filename: str):
 
 @app.get("/api/output/exists/{filename}")
 async def output_exists(filename: str):
+    if not OUTPUT_STAGE1_DIR.exists():
+        return {"exists": False}
     output_file = OUTPUT_STAGE1_DIR / filename
     return {"exists": output_file.exists()}
 
 
 @app.delete("/api/output/{filename}")
 async def delete_stage1_output(filename: str):
+    if not OUTPUT_STAGE1_DIR.exists():
+        return {"deleted": False}
     output_file = OUTPUT_STAGE1_DIR / filename
     if output_file.exists():
         output_file.unlink()
@@ -112,6 +118,8 @@ def _stage2_output_path(filename: str) -> Path:
 
 @app.get("/api/output_stage2/{filename}")
 async def get_stage2_output(filename: str):
+    if not OUTPUT_STAGE2_DIR.exists():
+        raise HTTPException(status_code=404, detail="Stage 2 output directory not found")
     output_file = _stage2_output_path(filename)
     if not output_file.exists():
         raise HTTPException(status_code=404, detail="Stage 2 output not found")
@@ -120,12 +128,16 @@ async def get_stage2_output(filename: str):
 
 @app.get("/api/output_stage2/exists/{filename}")
 async def output_stage2_exists(filename: str):
+    if not OUTPUT_STAGE2_DIR.exists():
+        return {"exists": False}
     output_file = _stage2_output_path(filename)
     return {"exists": output_file.exists()}
 
 
 @app.delete("/api/output_stage2/{filename}")
 async def delete_stage2_output(filename: str):
+    if not OUTPUT_STAGE2_DIR.exists():
+        return {"deleted": False}
     output_file = _stage2_output_path(filename)
     if output_file.exists():
         output_file.unlink()
@@ -140,29 +152,33 @@ async def analyze_case(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     # Check for cached output
-    output_file = OUTPUT_STAGE1_DIR / filename
-    if output_file.exists():
-        try:
-            with open(output_file, "r") as f:
-                data = json.load(f)
-            analysis = Analysis.model_validate(data)
+    if OUTPUT_STAGE1_DIR.exists():
+        output_file = OUTPUT_STAGE1_DIR / filename
+        if output_file.exists():
+            try:
+                with open(output_file, "r") as f:
+                    data = json.load(f)
+                analysis = Analysis.model_validate(data)
 
-            # Check if stage 2 output exists to get case type
-            case_type = None
-            stage2_file = _stage2_output_path(filename)
-            if stage2_file.exists():
-                try:
-                    stage2_data = json.loads(stage2_file.read_text(encoding="utf-8"))
-                    case_type = stage2_data.get("case_type")
-                except Exception:
-                    pass
+                # Check if stage 2 output exists to get case type
+                case_type = None
+                if OUTPUT_STAGE2_DIR.exists():
+                    stage2_file = _stage2_output_path(filename)
+                    if stage2_file.exists():
+                        try:
+                            stage2_data = json.loads(stage2_file.read_text(encoding="utf-8"))
+                            case_type = stage2_data.get("case_type")
+                        except Exception:
+                            pass
 
-            return format_analysis_html(analysis, case_type)
-        except Exception as e:
-            # If cache is invalid, ignore and re-analyze
-            print(f"Error reading cache: {e}")
+                return format_analysis_html(analysis, case_type)
+            except Exception as e:
+                # If cache is invalid, ignore and re-analyze
+                print(f"Error reading cache: {e}")
 
     try:
+        OUTPUT_STAGE1_DIR.mkdir(parents=True, exist_ok=True)
+        output_file = OUTPUT_STAGE1_DIR / filename
         stream = await get_case_analysis_stream(json_file, output_file)
         return StreamingResponse(
             stream,
@@ -220,6 +236,8 @@ async def run_batch(request: BatchRunRequest):
         skipped_count = 0
         error_count = 0
 
+        OUTPUT_STAGE1_DIR.mkdir(parents=True, exist_ok=True)
+        
         for json_file in to_process:
             filename = json_file.name
             output_file = OUTPUT_STAGE1_DIR / filename
@@ -256,12 +274,18 @@ async def analyze_case_stage2(filename: str):
     if not json_file.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
+    if not OUTPUT_STAGE1_DIR.exists():
+        raise HTTPException(
+            status_code=409, detail="Stage 1 output directory not found"
+        )
+    
     stage1_file = OUTPUT_STAGE1_DIR / filename
     if not stage1_file.exists():
         raise HTTPException(
             status_code=409, detail="Stage 1 output not found for this case"
         )
 
+    OUTPUT_STAGE2_DIR.mkdir(parents=True, exist_ok=True)
     output_file = _stage2_output_path(filename)
     if output_file.exists():
         return json.loads(output_file.read_text(encoding="utf-8"))
@@ -312,6 +336,12 @@ async def run_batch_stage2(request: BatchRunRequest):
         skipped_count = 0
         error_count = 0
 
+        if not OUTPUT_STAGE1_DIR.exists():
+            yield "data: Stage 1 output directory not found\n\n"
+            return
+        
+        OUTPUT_STAGE2_DIR.mkdir(parents=True, exist_ok=True)
+        
         for json_file in to_process:
             filename = json_file.name
             stage1_file = OUTPUT_STAGE1_DIR / filename
