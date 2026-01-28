@@ -4,18 +4,15 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class Analysis(BaseModel):
-    case_type: Literal["criminal", "civil"] = Field(description="Type of case: criminal or civil.")
+    case_type: Literal["criminal", "civil"] = Field(
+        description="Type of case: criminal or civil."
+    )
     facts: list[str] = Field(description="List of facts from the case.")
-    issues: list[str] = Field(description="List of legal issues identified from the case.")
+    issues: list[str] = Field(
+        description="List of legal issues identified from the case."
+    )
     reasonings: list[str] = Field(description="List of reasonings from the case.")
     outcomes: str = Field(description="Outcome of the case.")
-
-
-# Shared Base for common legal entities
-class LegalEntity(BaseModel):
-    role: Literal["Plaintiff", "Defendant", "Prosecution", "Victim"]
-    type: Literal["Individual", "Organization", "State"]
-    name: Optional[str] = None
 
 
 # 1. Criminal Case Model
@@ -49,7 +46,9 @@ class CivilAtomizedCase(BaseModel):
 
 class AtomizedCaseOutput(BaseModel):
     case_type: Literal["criminal", "civil"]
-    issues: List[str] = Field(description="List of legal issues identified from the case.")
+    issues: List[str] = Field(
+        description="List of legal issues identified from the case."
+    )
     criminal: Optional[CriminalAtomizedCase] = None
     civil: Optional[CivilAtomizedCase] = None
 
